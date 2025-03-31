@@ -1,0 +1,34 @@
+@IisManagerWeb.Api_HostAddress = http://localhost:5135
+
+### Obter todos os sites
+GET {{IisManagerWeb.Api_HostAddress}}/site/
+Accept: application/json
+
+### Obter site específico
+GET {{IisManagerWeb.Api_HostAddress}}/site/MeuSite
+Accept: application/json
+
+### Iniciar site
+POST {{IisManagerWeb.Api_HostAddress}}/site/MeuSite/start
+
+### Parar site
+POST {{IisManagerWeb.Api_HostAddress}}/site/MeuSite/stop
+
+### Reiniciar site
+POST {{IisManagerWeb.Api_HostAddress}}/site/MeuSite/restart
+
+### Atualizar caminho físico
+PUT {{IisManagerWeb.Api_HostAddress}}/site/MeuSite/physical-path?physicalPath=C:\inetpub\wwwroot\MeuSite
+
+### Atualizar certificado
+# O certificateHash deve ser uma string hexadecimal válida (exemplo: "1234567890ABCDEF")
+PUT {{IisManagerWeb.Api_HostAddress}}/site/MeuSite/certificate?certificateHash=1234567890ABCDEF&certificateStoreName=My
+
+### Atualizar pool de aplicação
+PUT {{IisManagerWeb.Api_HostAddress}}/site/MeuSite/application-pool?applicationPool=MeuPool
+
+### Adicionar binding
+POST {{IisManagerWeb.Api_HostAddress}}/site/MeuSite/bindings?protocol=https&bindingInformation=*:443:meusite.com
+
+### Remover binding
+DELETE {{IisManagerWeb.Api_HostAddress}}/site/MeuSite/bindings/*:443:meusite.com 

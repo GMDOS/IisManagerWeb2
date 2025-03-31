@@ -1,0 +1,42 @@
+﻿@page "/"
+
+<PageTitle>IIS Manager Web</PageTitle>
+
+<MudContainer Class="mt-6">
+    <MudText Typo="Typo.h3" GutterBottom="true">Bem-vindo ao IIS Manager Web</MudText>
+    <MudText Typo="Typo.body1" GutterBottom="true">
+        O IIS Manager Web é uma ferramenta para gerenciamento e monitoramento de servidores IIS.
+        Utilize o menu lateral para acessar as funcionalidades disponíveis.
+    </MudText>
+
+    <MudPaper Elevation="3" Class="pa-8 my-6">
+        <MudGrid>
+            @* <MudItem xs="12" md="6"> *@
+            @*     <MudText Typo="Typo.h5" GutterBottom="true">Funcionalidades</MudText> *@
+            @*     <MudList T="string" Dense="true"> *@
+            @*         <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">Monitoramento de servidores IIS</MudListItem> *@
+            @*         <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">Gerenciamento de sites e aplicações</MudListItem> *@
+            @*         <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">Visualização de logs e estatísticas</MudListItem> *@
+            @*         <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">Configuração de pools de aplicações</MudListItem> *@
+            @*         <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">Backup e restauração de configurações</MudListItem> *@
+            @*     </MudList> *@
+            @* </MudItem> *@
+            
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.h5" GutterBottom="true">Início Rápido</MudText>
+                <MudList T="string">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.ArrowRightAlt">
+                        <MudLink Href="/dashboard">Visualize o Dashboard</MudLink>
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.ArrowRightAlt">
+                        <MudLink Href="/settings">Configure o sistema</MudLink>
+                    </MudListItem>
+                </MudList>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+    
+    <MudAlert Severity="Severity.Info" Class="mt-8 mb-4">
+        Esta é uma versão de demonstração do IIS Manager Web. Alguns recursos podem não estar disponíveis.
+    </MudAlert>
+</MudContainer>

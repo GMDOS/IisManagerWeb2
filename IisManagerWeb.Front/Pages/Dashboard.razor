@@ -1,0 +1,108 @@
+@page "/dashboard"
+
+<PageTitle>Dashboard</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="height: 200px;">
+            <MudText Typo="Typo.h5">Servidores</MudText>
+            <MudDivider Class="my-2"/>
+            <MudText Typo="Typo.h3">5</MudText>
+            <MudText Typo="Typo.body2">Total de servidores monitorados</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="height: 200px;">
+            <MudText Typo="Typo.h5">Sites</MudText>
+            <MudDivider Class="my-2"/>
+            <MudText Typo="Typo.h3">15</MudText>
+            <MudText Typo="Typo.body2">Total de sites ativos</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="height: 200px;">
+            <MudText Typo="Typo.h5">Aplicações</MudText>
+            <MudDivider Class="my-2"/>
+            <MudText Typo="Typo.h3">32</MudText>
+            <MudText Typo="Typo.body2">Total de aplicações</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="height: 200px;">
+            <MudText Typo="Typo.h5">Estado</MudText>
+            <MudDivider Class="my-2"/>
+            <MudText Typo="Typo.h3" Color="Color.Success">Online</MudText>
+            <MudText Typo="Typo.body2">Status atual do sistema</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h5">Uso de Recursos</MudText>
+            <MudChart ChartType="ChartType.Line" ChartSeries="@Series" XAxisLabels="@XAxisLabels" Width="100%" Height="300px"></MudChart>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h5">Sites Mais Visitados</MudText>
+            <MudSimpleTable Style="overflow-x: auto;">
+                <thead>
+                    <tr>
+                        <th>Site</th>
+                        <th>Requisições</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var site in TopSites)
+                    {
+                        <tr>
+                            <td>@site.Name</td>
+                            <td>@site.Requests</td>
+                            <td>
+                                @if (site.Status == "Online")
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">@site.Status</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">@site.Status</MudChip>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<ChartSeries> Series = new List<ChartSeries>
+    {
+        new ChartSeries() { Name = "CPU", Data = new double[] { 30, 45, 25, 60, 75, 45, 30 } },
+        new ChartSeries() { Name = "Memória", Data = new double[] { 60, 70, 65, 55, 75, 80, 70 } }
+    };
+
+    private string[] XAxisLabels = { "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom" };
+
+    private List<SiteInfo> TopSites = new List<SiteInfo>
+    {
+        new SiteInfo { Name = "portal.exemplo.com", Requests = 15432, Status = "Online" },
+        new SiteInfo { Name = "app.exemplo.com", Requests = 12345, Status = "Online" },
+        new SiteInfo { Name = "blog.exemplo.com", Requests = 8765, Status = "Online" },
+        new SiteInfo { Name = "intranet.exemplo.com", Requests = 5432, Status = "Offline" },
+        new SiteInfo { Name = "api.exemplo.com", Requests = 4321, Status = "Online" }
+    };
+
+    public class SiteInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Requests { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+} 

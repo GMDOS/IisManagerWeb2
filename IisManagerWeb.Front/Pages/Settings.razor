@@ -1,0 +1,134 @@
+@page "/settings"
+
+<PageTitle>Configurações</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Configurações</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudForm Model="@settings" @ref="form">
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.h5" GutterBottom="true">Configurações Gerais</MudText>
+                
+                <MudTextField T="string" Label="Nome da Organização" 
+                              @bind-Value="settings.OrganizationName" 
+                              Required="true" RequiredError="Nome da organização é obrigatório" 
+                              Class="mb-3"/>
+                
+                <MudSelect T="string" Label="Tema" @bind-Value="settings.Theme" Class="mb-3">
+                    <MudSelectItem Value="@("light")">Claro</MudSelectItem>
+                    <MudSelectItem Value="@("dark")">Escuro</MudSelectItem>
+                    <MudSelectItem Value="@("system")">Sistema</MudSelectItem>
+                </MudSelect>
+                
+                <MudSelect T="string" Label="Idioma" @bind-Value="settings.Language" Class="mb-3">
+                    <MudSelectItem Value="@("pt-BR")">Português (Brasil)</MudSelectItem>
+                    <MudSelectItem Value="@("en-US")">Inglês (EUA)</MudSelectItem>
+                    <MudSelectItem Value="@("es-ES")">Espanhol</MudSelectItem>
+                </MudSelect>
+                
+                <MudSwitch T="bool" Checked="settings.EnableNotifications" 
+                           CheckedChanged="@((bool val) => settings.EnableNotifications = val)"
+                           Label="Ativar Notificações" Color="Color.Primary" 
+                           Class="mb-3"/>
+            </MudItem>
+            
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.h5" GutterBottom="true">Configurações do Servidor</MudText>
+                
+                <MudTextField T="int" Label="Intervalo de Atualização (segundos)" 
+                              @bind-Value="settings.RefreshInterval"
+                              Min="5" Max="300" Class="mb-3"/>
+                
+                <MudTextField T="int" Label="Limite de Conexões" 
+                              @bind-Value="settings.ConnectionLimit"
+                              Min="1" Max="1000" Class="mb-3"/>
+                
+                <MudTextField T="string" Label="URL do Servidor" 
+                              @bind-Value="settings.ServerUrl" 
+                              Required="true" RequiredError="URL do servidor é obrigatória"
+                              Class="mb-3"/>
+                
+                <MudSwitch T="bool" Checked="settings.EnableLogging" 
+                           CheckedChanged="@((bool val) => settings.EnableLogging = val)"
+                           Label="Ativar Logging" Color="Color.Primary" 
+                           Class="mb-3"/>
+                
+                <MudSwitch T="bool" Checked="settings.EnableSSL" 
+                           CheckedChanged="@((bool val) => settings.EnableSSL = val)"
+                           Label="Forçar SSL" Color="Color.Primary" 
+                           Class="mb-3"/>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                          OnClick="SaveSettings" Class="mr-2">Salvar</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" 
+                          OnClick="ResetSettings">Redefinir</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm form = null!;
+    private IisAppSettings settings = new IisAppSettings
+    {
+        OrganizationName = "Minha Empresa",
+        Theme = "light",
+        Language = "pt-BR",
+        EnableNotifications = true,
+        RefreshInterval = 30,
+        ConnectionLimit = 100,
+        ServerUrl = "https://localhost:5001",
+        EnableLogging = true,
+        EnableSSL = true
+    };
+    
+    private async Task SaveSettings()
+    {
+        await form.Validate();
+        
+        if (form.IsValid)
+        {
+            // Implementação real salvaria as configurações
+            await Task.Delay(1000); // Simula operação async
+            
+            // Notificação de sucesso
+            var options = new MudBlazor.DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+            // var dialog = DialogService.Show<MudBlazor.DialogContentText>("Configurações salvas com sucesso!", options);
+        }
+    }
+    
+    private void ResetSettings()
+    {
+        settings = new IisAppSettings
+        {
+            OrganizationName = "Minha Empresa",
+            Theme = "light",
+            Language = "pt-BR",
+            EnableNotifications = true,
+            RefreshInterval = 30,
+            ConnectionLimit = 100,
+            ServerUrl = "https://localhost:5001",
+            EnableLogging = true,
+            EnableSSL = true
+        };
+    }
+    
+    [Inject]
+    public required IDialogService DialogService { get; set; }
+    
+    public class IisAppSettings
+    {
+        public required string OrganizationName { get; set; }
+        public required string Theme { get; set; }
+        public required string Language { get; set; }
+        public bool EnableNotifications { get; set; }
+        public int RefreshInterval { get; set; }
+        public int ConnectionLimit { get; set; }
+        public required string ServerUrl { get; set; }
+        public bool EnableLogging { get; set; }
+        public bool EnableSSL { get; set; }
+    }
+} 

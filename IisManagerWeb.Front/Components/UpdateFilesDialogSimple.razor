@@ -1,0 +1,118 @@
+@namespace IisManagerWeb.Front.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Web.Administration
+@using MudBlazor
+@inject SiteService SiteService
+@inject ISnackbar Snackbar
+@rendermode RenderMode.InteractiveWebAssembly
+
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex flex-column">
+            <MudText Typo="Typo.h6" Class="mb-4">Atualizar Site: @SiteName</MudText>
+            
+            <MudText Class="mb-4">Selecione um arquivo ZIP com os novos arquivos</MudText>
+            
+            <InputFile OnChange="OnInputFileChanged" accept=".zip" class="d-none" id="fileInput" />
+            <MudButton HtmlTag="label"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.CloudUpload"
+                       for="fileInput">
+                Selecionar arquivo ZIP
+            </MudButton>
+            
+            @if (selectedFile != null)
+            {
+                <MudText Class="mt-3">@selectedFile.Name (@(Math.Round((double)selectedFile.Size / 1024, 2)) KB)</MudText>
+            }
+            
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <MudText Color="@messageColor" Class="mt-3">@message</MudText>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CancelDialog" Color="Color.Default" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton OnClick="Upload" Color="Color.Primary" Variant="Variant.Filled" 
+                   Disabled="@(selectedFile == null || isUploading)">
+            @if (isUploading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Enviando...</span>
+            }
+            else
+            {
+                <span>Enviar e Atualizar</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string SiteName { get; set; } = "";
+    
+    private IBrowserFile? selectedFile;
+    private string message = "";
+    private Color messageColor = Color.Success;
+    private bool isUploading = false;
+    
+    private void OnInputFileChanged(InputFileChangeEventArgs args)
+    {
+        selectedFile = args.File;
+        StateHasChanged();
+    }
+    
+    private void CancelDialog()
+    {
+        try
+        {
+            MudDialog.Cancel();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao cancelar diálogo: {ex.Message}");
+        }
+    }
+    
+    private async Task Upload()
+    {
+        if (selectedFile == null) return;
+        
+        try
+        {
+            isUploading = true;
+            message = "Enviando arquivo...";
+            messageColor = Color.Info;
+            StateHasChanged();
+            
+            // Ler o arquivo
+            var content = new byte[selectedFile.Size];
+            await selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).ReadAsync(content);
+            
+            // Enviar para o serviço
+            await SiteService.UpdateSiteFilesAsync(SiteName, content);
+            
+            message = "Arquivo enviado com sucesso!";
+            messageColor = Color.Success;
+            Snackbar.Add("Site atualizado com sucesso!", Severity.Success);
+            
+            // Fechar o diálogo
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            message = $"Erro: {ex.Message}";
+            messageColor = Color.Error;
+            Snackbar.Add($"Erro ao atualizar site: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isUploading = false;
+            StateHasChanged();
+        }
+    }
+} 

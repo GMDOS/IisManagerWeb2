@@ -28,7 +28,7 @@
                 </MudSelect>
                 
                 <MudSwitch T="bool" Checked="settings.EnableNotifications" 
-                           CheckedChanged="@((bool val) => settings.EnableNotifications = val)"
+                           CheckedChanged="((value) => settings.EnableNotifications = value)"
                            Label="Ativar Notificações" Color="Color.Primary" 
                            Class="mb-3"/>
             </MudItem>
@@ -38,11 +38,11 @@
                 
                 <MudTextField T="int" Label="Intervalo de Atualização (segundos)" 
                               @bind-Value="settings.RefreshInterval"
-                              Min="5" Max="300" Class="mb-3"/>
+                              Minimum="5" Maximum="300" Class="mb-3"/>
                 
                 <MudTextField T="int" Label="Limite de Conexões" 
                               @bind-Value="settings.ConnectionLimit"
-                              Min="1" Max="1000" Class="mb-3"/>
+                              Minimum="1" Maximum="1000" Class="mb-3"/>
                 
                 <MudTextField T="string" Label="URL do Servidor" 
                               @bind-Value="settings.ServerUrl" 
@@ -50,12 +50,12 @@
                               Class="mb-3"/>
                 
                 <MudSwitch T="bool" Checked="settings.EnableLogging" 
-                           CheckedChanged="@((bool val) => settings.EnableLogging = val)"
+                           CheckedChanged="((value) => settings.EnableLogging = value)"
                            Label="Ativar Logging" Color="Color.Primary" 
                            Class="mb-3"/>
                 
                 <MudSwitch T="bool" Checked="settings.EnableSSL" 
-                           CheckedChanged="@((bool val) => settings.EnableSSL = val)"
+                           CheckedChanged="((value) => settings.EnableSSL = value)"
                            Label="Forçar SSL" Color="Color.Primary" 
                            Class="mb-3"/>
             </MudItem>

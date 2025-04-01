@@ -55,7 +55,7 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [CascadingParameter] IMudDialogInstance? MudDialog { get; set; } = null!;
     [Parameter] public string SiteName { get; set; } = string.Empty;
     
     private IBrowserFile? file;

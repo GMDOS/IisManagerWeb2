@@ -57,6 +57,7 @@ var app = builder.Build();
 app.UseCors();
 
 app.GetSiteRoutes();
+app.GetSiteGroupRoutes();
 
 app.Run();
 
@@ -73,6 +74,8 @@ app.Run();
 [JsonSerializable(typeof(List<BindingDto>))]
 [JsonSerializable(typeof(BindingDto))]
 [JsonSerializable(typeof(ObjectState))]
+[JsonSerializable(typeof(List<SiteGroupDto>))]
+[JsonSerializable(typeof(SiteGroupDto))]
 internal partial class AppJsonSerializerContext : JsonSerializerContext
 {
 }

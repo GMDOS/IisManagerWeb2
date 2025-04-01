@@ -1,0 +1,112 @@
+@namespace IisManagerWeb.Front.Components
+@using MudBlazor
+@using IisManagerWeb.Shared.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4">
+            @(IsEditing ? "Editar Grupo" : "Novo Grupo")
+        </MudText>
+        
+        <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex flex-column gap-4">
+            <MudPaper Class="pa-4" Elevation="0">
+                <MudTextField T="string" @bind-Value="groupName" Label="Nome do Grupo" 
+                            Required="true" RequiredError="Nome do grupo é obrigatório"
+                            Disabled="@IsEditing"/>
+                
+                <MudText Class="mt-4">Sites no grupo:</MudText>
+                <MudList T="SiteSelection" Dense="true" Class="mt-2">
+                    @foreach (var site in selectedSites)
+                    {
+                        <MudListItem T="SiteSelection">
+                            <MudCheckBox T="bool" Checked="@site.IsSelected" 
+                                       CheckedChanged="@((value) => site.IsSelected = value)"
+                                       Label="@site.Name"/>
+                        </MudListItem>
+                    }
+                </MudList>
+                
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-3">@errorMessage</MudAlert>
+                }
+            </MudPaper>
+        </MudContainer>
+    </DialogContent>
+    
+    <DialogActions>
+        <MudButton OnClick="Cancel" Color="Color.Default" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="Submit" Color="Color.Primary" Variant="Variant.Filled" 
+                  Disabled="@(string.IsNullOrWhiteSpace(groupName) || !selectedSites.Any(s => s.IsSelected))">
+            @(IsEditing ? "Salvar" : "Criar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance? MudDialog { get; set; } = null!;
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public string? ExistingGroupName { get; set; }
+    [Parameter] public List<SiteDto> AvailableSites { get; set; } = new();
+    
+    private string groupName = string.Empty;
+    private string errorMessage = string.Empty;
+    private List<SiteSelection> selectedSites = new();
+    
+    private class SiteSelection
+    {
+        public string Name { get; set; } = string.Empty;
+        public bool IsSelected { get; set; }
+    }
+    
+    protected override void OnInitialized()
+    {
+        selectedSites = AvailableSites.Select(s => new SiteSelection 
+        { 
+            Name = s.Name,
+            IsSelected = false
+        }).ToList();
+        
+        if (IsEditing && !string.IsNullOrEmpty(ExistingGroupName))
+        {
+            groupName = ExistingGroupName;
+        }
+    }
+    
+    private void OnSiteSelectionChanged(SiteSelection site, bool value)
+    {
+        site.IsSelected = value;
+        StateHasChanged();
+    }
+    
+    private void Cancel()
+    {
+        MudDialog?.Cancel();
+    }
+    
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(groupName))
+        {
+            errorMessage = "Nome do grupo é obrigatório";
+            return;
+        }
+        
+        var selectedSiteNames = selectedSites.Where(s => s.IsSelected).Select(s => s.Name).ToList();
+        if (!selectedSiteNames.Any())
+        {
+            errorMessage = "Selecione pelo menos um site";
+            return;
+        }
+        
+        var group = new SiteGroupDto
+        {
+            Name = groupName,
+            SiteNames = selectedSiteNames,
+            CreatedAt = DateTime.UtcNow,
+            LastModifiedAt = DateTime.UtcNow
+        };
+        
+        MudDialog?.Close(group);
+    }
+} 

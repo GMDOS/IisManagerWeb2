@@ -52,4 +52,46 @@ public class SiteService
         var response = await _httpClient.PostAsync($"sites/{name}/update-files", content);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<List<SiteGroupDto>> GetSiteGroupsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<List<SiteGroupDto>>("site-groups") ?? new List<SiteGroupDto>();
+    }
+
+    public async Task<SiteGroupDto> GetSiteGroupAsync(string name)
+    {
+        return await _httpClient.GetFromJsonAsync<SiteGroupDto>($"site-groups/{name}") ?? new SiteGroupDto();
+    }
+
+    public async Task<SiteGroupDto> CreateSiteGroupAsync(SiteGroupDto group)
+    {
+        var response = await _httpClient.PostAsJsonAsync("site-groups", group);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SiteGroupDto>() ?? new SiteGroupDto();
+    }
+
+    public async Task<SiteGroupDto> UpdateSiteGroupAsync(string name, SiteGroupDto group)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"site-groups/{name}", group);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SiteGroupDto>() ?? new SiteGroupDto();
+    }
+
+    public async Task DeleteSiteGroupAsync(string name)
+    {
+        var response = await _httpClient.DeleteAsync($"site-groups/{name}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task StartSiteGroupAsync(string name)
+    {
+        var response = await _httpClient.PostAsync($"site-groups/{name}/start", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task StopSiteGroupAsync(string name)
+    {
+        var response = await _httpClient.PostAsync($"site-groups/{name}/stop", null);
+        response.EnsureSuccessStatusCode();
+    }
 } 

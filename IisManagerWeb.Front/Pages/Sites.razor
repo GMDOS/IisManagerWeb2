@@ -14,7 +14,7 @@
     <MudText Typo="Typo.h4" Class="mb-4">Gerenciador de Sites IIS</MudText>
 
     <MudGrid>
-        <!-- Lista de Sites -->
+        <!-- Lista de Sites/Grupos -->
         <MudItem xs="12" sm="4" md="3">
             <MudPaper Class="pa-3" Elevation="3">
                 <MudStack>
@@ -40,11 +40,11 @@
                     }
                     else
                     {
-                        <div @oncontextmenu="e => OnRightClickHandler(e)" @oncontextmenu:preventDefault="true" style="width: 100%">
-                            <MudList T="string" Clickable="true" Style="width: 100%">
+                        <div @oncontextmenu="OnRightClick" @oncontextmenu:preventDefault="true" style="width: 100%">
+                            <MudList T="SiteDto" Clickable="true" Style="width: 100%">
                                 @foreach (var site in filteredSites)
                                 {
-                                    <MudListItem Text="@site.Name"
+                                    <MudListItem T="SiteDto" Text="@site.Name"
                                                  Icon="@GetSiteIcon(site.State)"
                                                  IconColor="@GetSiteColor(site.State)"
                                                  OnClick="@(() => SelectSite(site))"
@@ -58,7 +58,7 @@
                                    AnchorOrigin="Origin.TopLeft"
                                    TransformOrigin="Origin.TopLeft"
                                    Fixed="true"
-                                   OverrideMaxHeight="false"
+                                   MaxHeight="null"
                                    Paper="true"
                                    Class="pa-4 popup-menu">
                             <div class="d-flex flex-column py-2" style="min-width: 150px;">
@@ -89,259 +89,251 @@
                         Atualizar
                     </MudButton>
                 }
-                @if (ListaSelecionada == "Grupos")
+                else
                 {
+                    @if (isLoadingGroups)
+                    {
+                        <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+                    }
+                    else if (siteGroups == null || !siteGroups.Any())
+                    {
+                        <MudAlert Severity="Severity.Info">Nenhum grupo encontrado.</MudAlert>
+                    }
+                    else
+                    {
+                        <MudList T="SiteGroupDto" Clickable="true" Style="width: 100%">
+                            @foreach (var group in siteGroups)
+                            {
+                                <MudListItem T="SiteGroupDto" Text="@group.Name"
+                                             Icon="@Icons.Material.Filled.Folder"
+                                             OnClick="@(() => SelectGroup(group))"
+                                             Class="@(IsGroupSelected(group) ? "mud-selected-item mud-primary-text mud-primary-hover" : "")">
+                                    <MudText Typo="Typo.caption" Class="mt-1">
+                                        @group.SiteNames.Count sites
+                                    </MudText>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
                 }
-
             </MudPaper>
         </MudItem>
 
-        <!-- Detalhes do Site -->
+        <!-- Detalhes -->
         <MudItem xs="12" sm="8" md="9">
-            @if (selectedSites.Count > 0)
+            @if (ListaSelecionada == "Sites")
             {
-                <MudPaper Class="pa-4" Elevation="3">
-                    <MudGrid>
-                        <MudItem xs="12">
-                            <div class="d-flex justify-space-between align-center">
-                                <MudText Typo="Typo.h5">
-                                    @if (selectedSites.Count == 1)
+                @if (selectedSites.Count == 1)
+                {
+                    var selectedSite = selectedSites[0];
+                    <!-- Informações do Site -->
+                    <MudItem xs="12" md="6">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Informações do Site</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudList T="string" ReadOnly="true" Dense="true">
+                                    <MudListItem Icon="@Icons.Material.Filled.Info">
+                                        <MudText><b>ID:</b> @selectedSite.Id</MudText>
+                                    </MudListItem>
+                                    <MudListItem Icon="@Icons.Material.Filled.Settings">
+                                        <MudText><b>Inicialização Automática:</b> @selectedSite.ServerAutoStart
+                                        </MudText>
+                                    </MudListItem>
+                                    <MudListItem Icon="@Icons.Material.Filled.Api">
+                                        <MudText><b>Estado:</b> @selectedSite.State</MudText>
+                                    </MudListItem>
+                                </MudList>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <!-- Aplicações do Site -->
+                    <MudItem xs="12" md="6">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Aplicações</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (selectedSite.Applications.Any())
+                                {
+                                    <MudTable Items="@selectedSite.Applications" Hover="true" Striped="true">
+                                        <HeaderContent>
+                                            <MudTh>Caminho</MudTh>
+                                            <MudTh>Pool de Aplicação</MudTh>
+                                        </HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd DataLabel="Caminho">@context.Path</MudTd>
+                                            <MudTd DataLabel="Pool de Aplicação">@context.ApplicationPoolName</MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                }
+                                else
+                                {
+                                    <MudAlert Severity="Severity.Info">Nenhuma aplicação encontrada.</MudAlert>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <!-- Bindings do Site -->
+                    <MudItem xs="12">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Bindings</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (selectedSite.Bindings.Any())
+                                {
+                                    <MudTable Items="@selectedSite.Bindings" Hover="true" Striped="true">
+                                        <HeaderContent>
+                                            <MudTh>Protocolo</MudTh>
+                                            <MudTh>Host</MudTh>
+                                            <MudTh>Binding</MudTh>
+                                            <MudTh>Endpoint</MudTh>
+                                        </HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd DataLabel="Protocolo">@context.Protocol</MudTd>
+                                            <MudTd
+                                                DataLabel="Host">@(string.IsNullOrEmpty(context.Host) ? "*" : context.Host)</MudTd>
+                                            <MudTd DataLabel="Binding">@context.BindingInformation</MudTd>
+                                            <MudTd DataLabel="Endpoint">@context.EndPoint</MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                }
+                                else
+                                {
+                                    <MudAlert Severity="Severity.Info">Nenhum binding encontrado.</MudAlert>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+                else if (selectedSites.Count > 1)
+                {
+                    <MudItem xs="12">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Sites Selecionados</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudList T="SiteDto" Dense="true">
+                                    @foreach (var site in selectedSites)
                                     {
-                                        <MudIcon Icon="@GetSiteIcon(selectedSites[0].State)"
-                                                 Color="@GetSiteColor(selectedSites[0].State)" Class="mr-2"/>
-                                        @selectedSites[0].Name
+                                        <MudListItem T="SiteDto">
+                                            <MudText>@site.Name</MudText>
+                                            <MudText Typo="Typo.caption">Estado: @site.State</MudText>
+                                        </MudListItem>
                                     }
-                                    else
-                                    {
-                                        <MudIcon Icon="@Icons.Material.Filled.List" Color="Color.Primary" Class="mr-2"/>
-                                        <span class="mr-2">@selectedSites.Count sites selecionados</span>
-                                    }
-                                </MudText>
-                                <div>
-                                    <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
-                                        <MudButton OnClick="StartSelectedSites"
-                                                   Disabled="@(!selectedSites.Any() || selectedSites.All(s => s.State == ObjectState.Started))">
-                                            <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Class="mr-2"/>
-                                        </MudButton>
-                                        <MudButton OnClick="StopSelectedSites"
-                                                   Disabled="@(!selectedSites.Any() || selectedSites.All(s => s.State == ObjectState.Stopped))">
-                                            <MudIcon Icon="@Icons.Material.Filled.Stop" Class="mr-2"/>
-                                        </MudButton>
-                                        <MudButton OnClick="RestartSelectedSites" Disabled="@(!selectedSites.Any())">
-                                            <MudIcon Icon="@Icons.Material.Filled.Refresh" Class="mr-2"/>
-                                            Reiniciar
-                                        </MudButton>
-                                        <MudButton OnClick="@OpenDialogViaService" Disabled="@(selectedSites.Count != 1)">
-                                            <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2"/>
-                                            Atualizar
-                                        </MudButton>
-                                    </MudButtonGroup>
-                                </div>
-                            </div>
-                        </MudItem>
-
-                        @if (selectedSites.Count == 1)
-                        {
-                            var selectedSite = selectedSites[0];
-                            <!-- Informações do Site -->
-                            <MudItem xs="12" md="6">
-                                <MudCard>
-                                    <MudCardHeader>
-                                        <CardHeaderContent>
-                                            <MudText Typo="Typo.h6">Informações do Site</MudText>
-                                        </CardHeaderContent>
-                                    </MudCardHeader>
-                                    <MudCardContent>
-                                        <MudList T="string" ReadOnly="true" Dense="true">
-                                            <MudListItem Icon="@Icons.Material.Filled.Info">
-                                                <MudText><b>ID:</b> @selectedSite.Id</MudText>
-                                            </MudListItem>
-                                            <MudListItem Icon="@Icons.Material.Filled.Settings">
-                                                <MudText><b>Inicialização Automática:</b> @selectedSite.ServerAutoStart
-                                                </MudText>
-                                            </MudListItem>
-                                            <MudListItem Icon="@Icons.Material.Filled.Api">
-                                                <MudText><b>Estado:</b> @selectedSite.State</MudText>
-                                            </MudListItem>
-                                        </MudList>
-                                    </MudCardContent>
-                                </MudCard>
-                            </MudItem>
-
-                            <!-- Aplicações do Site -->
-                            <MudItem xs="12" md="6">
-                                <MudCard>
-                                    <MudCardHeader>
-                                        <CardHeaderContent>
-                                            <MudText Typo="Typo.h6">Aplicações (@selectedSite.Applications.Count)
-                                            </MudText>
-                                        </CardHeaderContent>
-                                    </MudCardHeader>
-                                    <MudCardContent Style="max-height: 300px; overflow-y: auto;">
-                                        @if (!selectedSite.Applications.Any())
-                                        {
-                                            <MudAlert Severity="Severity.Info">Nenhuma aplicação encontrada.</MudAlert>
-                                        }
-                                        else
-                                        {
-                                            <MudList T="string" ReadOnly="true" Dense="true">
-                                                @foreach (var app in selectedSite.Applications)
-                                                {
-                                                    <MudListItem Icon="@Icons.Material.Filled.Web">
-                                                        <div>
-                                                            <MudText><b>Caminho:</b> @app.Path</MudText>
-                                                            <MudText><b>Pool:</b> @app.ApplicationPoolName</MudText>
-                                                        </div>
-                                                    </MudListItem>
-                                                }
-                                            </MudList>
-                                        }
-                                    </MudCardContent>
-                                </MudCard>
-                            </MudItem>
-
-                            <!-- Bindings do Site -->
-                            <MudItem xs="12">
-                                <MudCard>
-                                    <MudCardHeader>
-                                        <CardHeaderContent>
-                                            <MudText Typo="Typo.h6">Bindings (@selectedSite.Bindings.Count)</MudText>
-                                        </CardHeaderContent>
-                                    </MudCardHeader>
-                                    <MudCardContent>
-                                        @if (!selectedSite.Bindings.Any())
-                                        {
-                                            <MudAlert Severity="Severity.Info">Nenhum binding encontrado.</MudAlert>
-                                        }
-                                        else
-                                        {
-                                            <MudTable Items="@selectedSite.Bindings" Hover="true" Striped="true">
-                                                <HeaderContent>
-                                                    <MudTh>Protocolo</MudTh>
-                                                    <MudTh>Host</MudTh>
-                                                    <MudTh>Binding</MudTh>
-                                                    <MudTh>Endpoint</MudTh>
-                                                </HeaderContent>
-                                                <RowTemplate>
-                                                    <MudTd DataLabel="Protocolo">@context.Protocol</MudTd>
-                                                    <MudTd
-                                                        DataLabel="Host">@(string.IsNullOrEmpty(context.Host) ? "*" : context.Host)</MudTd>
-                                                    <MudTd DataLabel="Binding">@context.BindingInformation</MudTd>
-                                                    <MudTd DataLabel="Endpoint">@context.EndPoint</MudTd>
-                                                </RowTemplate>
-                                            </MudTable>
-                                        }
-                                    </MudCardContent>
-                                </MudCard>
-                            </MudItem>
-                        }
-                        else
-                        {
-                            <MudItem xs="12">
-                                <MudCard>
-                                    <MudCardHeader>
-                                        <CardHeaderContent>
-                                            <MudText Typo="Typo.h6">Sites Selecionados</MudText>
-                                        </CardHeaderContent>
-                                    </MudCardHeader>
-                                    <MudCardContent>
-                                        <MudTable Items="@selectedSites" Hover="true" Striped="true">
-                                            <HeaderContent>
-                                                <MudTh>Nome</MudTh>
-                                                <MudTh>ID</MudTh>
-                                                <MudTh>Estado</MudTh>
-                                            </HeaderContent>
-                                            <RowTemplate>
-                                                <MudTd DataLabel="Nome">@context.Name</MudTd>
-                                                <MudTd DataLabel="ID">@context.Id</MudTd>
-                                                <MudTd DataLabel="Estado">
-                                                    <MudIcon Icon="@GetSiteIcon(context.State)"
-                                                             Color="@GetSiteColor(context.State)"
-                                                             Size="Size.Small"
-                                                             Class="mr-2"/>
-                                                    @context.State
-                                                </MudTd>
-                                            </RowTemplate>
-                                        </MudTable>
-                                    </MudCardContent>
-                                </MudCard>
-                            </MudItem>
-                        }
-                    </MudGrid>
-                </MudPaper>
+                                </MudList>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
             }
             else
             {
-                <MudPaper Class="pa-4 d-flex align-center justify-center" Style="height: 500px;" Elevation="3">
-                    <div class="text-center">
-                        <MudIcon Icon="@Icons.Material.Filled.Web" Color="Color.Primary" Size="Size.Large"/>
-                        <MudText Typo="Typo.h5" Class="mt-2">Selecione um site para ver os detalhes</MudText>
-                    </div>
-                </MudPaper>
+                @if (selectedGroup != null)
+                {
+                    <MudItem xs="12">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Informações do Grupo</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudButton Color="Color.Primary" OnClick="@(() => StartGroup(selectedGroup))"
+                                              StartIcon="@Icons.Material.Filled.PlayArrow">Iniciar Todos</MudButton>
+                                    <MudButton Color="Color.Error" OnClick="@(() => StopGroup(selectedGroup))"
+                                              StartIcon="@Icons.Material.Filled.Stop">Parar Todos</MudButton>
+                                    <MudButton Color="Color.Secondary" OnClick="@(() => EditGroup(selectedGroup))"
+                                              StartIcon="@Icons.Material.Filled.Edit">Editar</MudButton>
+                                    <MudButton Color="Color.Error" OnClick="@(() => DeleteGroup(selectedGroup))"
+                                              StartIcon="@Icons.Material.Filled.Delete">Excluir</MudButton>
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudList T="string" Dense="true">
+                                    <MudListItem>
+                                        <MudText><b>Nome:</b> @selectedGroup.Name</MudText>
+                                    </MudListItem>
+                                    <MudListItem>
+                                        <MudText><b>Criado em:</b> @selectedGroup.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudText>
+                                    </MudListItem>
+                                    @if (selectedGroup.LastModifiedAt.HasValue)
+                                    {
+                                        <MudListItem>
+                                            <MudText><b>Última modificação:</b> @selectedGroup.LastModifiedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
+                                        </MudListItem>
+                                    }
+                                </MudList>
+
+                                <MudText Typo="Typo.h6" Class="mt-4">Sites no grupo:</MudText>
+                                <MudTable Items="@GetGroupSites()" Hover="true" Striped="true">
+                                    <HeaderContent>
+                                        <MudTh>Nome</MudTh>
+                                        <MudTh>Estado</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Nome">@context.Name</MudTd>
+                                        <MudTd DataLabel="Estado">@context.State</MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
             }
         </MudItem>
     </MudGrid>
 </MudContainer>
 
-<!-- Diálogo para upload de arquivo ZIP -->
-<!-- <MudDialog @bind-IsVisible="fileDialogVisible" Options="dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2" />
-            Atualizar Arquivos do Site
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudText Class="mb-4">
-            Selecione um arquivo ZIP com os novos arquivos para atualizar o site: <strong>@(selectedSites.Count == 1 ? selectedSites[0].Name : "")</strong>
-        </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Warning" Class="mb-4">
-            Atenção: Esta ação irá parar o site, fazer backup dos arquivos atuais e substituí-los pelo conteúdo do ZIP.
-        </MudText>
-        
-        <InputFile OnChange="OnInputFileChanged" accept=".zip" class="d-none" id="fileInput" />
-        <MudButton HtmlTag="label"
-                   Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.CloudUpload"
-                   for="fileInput">
-            Selecionar arquivo ZIP
-        </MudButton>
-        
-        @if (selectedFile != null)
-        {
-            <MudPaper Class="d-flex align-center pa-2 mt-2">
-                <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Class="mr-2" />
-                <MudText>@selectedFile.Name (@(Math.Round((double)selectedFile.Size / 1024, 2)) KB)</MudText>
-            </MudPaper>
-        }
-        
-        @if (!string.IsNullOrEmpty(uploadMessage))
-        {
-            <MudAlert Severity="@uploadSeverity" Class="mt-3">@uploadMessage</MudAlert>
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@CloseUpdateFilesDialog" Variant="Variant.Outlined" Color="Color.Default">Cancelar</MudButton>
-        <MudButton OnClick="UploadZipFile" Variant="Variant.Filled" Color="Color.Primary" 
-                   Disabled="@(selectedFile == null || isUploading)">
-            @if (isUploading)
-            {
-                <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
-                <span>Enviando...</span>
-            }
-            else
-            {
-                <span>Enviar e Atualizar</span>
-            }
-        </MudButton>
-    </DialogActions>
-</MudDialog> -->
+<MudMenu @bind-Open="menuOpen" 
+         AnchorOrigin="Origin.TopLeft" 
+         TransformOrigin="Origin.TopLeft" 
+         Position="@(new Guid().ToString())"
+         RelativeX="@menuX" 
+         RelativeY="@menuY">
+    @if (selectedSites.Count > 1)
+    {
+        <MudMenuItem OnClick="@(() => CreateGroupFromSelected())">
+            <MudIcon Icon="@Icons.Material.Filled.CreateNewFolder" Class="mr-2"/>
+            Criar Grupo
+        </MudMenuItem>
+    }
+    @if (selectedSites.Count == 1)
+    {
+        <MudMenuItem OnClick="@(() => StartSite(selectedSites[0]))">
+            <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Class="mr-2"/>
+            Iniciar
+        </MudMenuItem>
+        <MudMenuItem OnClick="@(() => StopSite(selectedSites[0]))">
+            <MudIcon Icon="@Icons.Material.Filled.Stop" Class="mr-2"/>
+            Parar
+        </MudMenuItem>
+        <MudMenuItem OnClick="@(() => RestartSite(selectedSites[0]))">
+            <MudIcon Icon="@Icons.Material.Filled.Refresh" Class="mr-2"/>
+            Reiniciar
+        </MudMenuItem>
+    }
+</MudMenu>
 
 @code {
-    private List<SiteDto>? sites = new();
+    private List<SiteDto> sites = new();
     private List<SiteDto> selectedSites = new();
+    private List<SiteGroupDto> siteGroups = new();
+    private SiteGroupDto? selectedGroup;
     private bool isLoading = true;
+    private bool isLoadingGroups = true;
     private string searchString = "";
     private string ListaSelecionada = "Sites";
     private bool isCtrlPressed = false;
@@ -350,7 +342,7 @@
     private string menuY = "0px";
     private DialogOptions dialogOptions = new() { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
 
-    private IEnumerable<SiteDto> filteredSites => sites
+    private IEnumerable<SiteDto> filteredSites => (sites ?? new List<SiteDto>())
         .Where(s => string.IsNullOrWhiteSpace(searchString) ||
                     s.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
         .ToList();
@@ -358,6 +350,7 @@
     protected override async Task OnInitializedAsync()
     {
         await RefreshSites();
+        await RefreshGroups();
     }
 
     private async Task OnRightClick(MouseEventArgs e)
@@ -373,7 +366,7 @@
         menuY = $"{e.ClientY}px";
         
         menuOpen = true;
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task RefreshSites()
@@ -399,31 +392,47 @@
         }
     }
 
+    private async Task RefreshGroups()
+    {
+        try
+        {
+            isLoadingGroups = true;
+            siteGroups = await SiteService.GetSiteGroupsAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar grupos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingGroups = false;
+        }
+    }
+
     private void SelectSite(SiteDto site)
     {
-        if (isCtrlPressed)
+        if (!isCtrlPressed)
         {
-            // Com Ctrl pressionado, adiciona ou remove da seleção
-            if (IsSiteSelected(site))
-            {
-                selectedSites.RemoveAll(s => s.Id == site.Id);
-            }
-            else
-            {
-                selectedSites.Add(site);
-            }
-        }
-        else
-        {
-            // Sem Ctrl, seleciona apenas o site clicado
             selectedSites.Clear();
-            selectedSites.Add(site);
         }
+        selectedSites.Add(site);
+        StateHasChanged();
+    }
+
+    private void SelectGroup(SiteGroupDto group)
+    {
+        selectedGroup = group;
+        StateHasChanged();
     }
 
     private bool IsSiteSelected(SiteDto site)
     {
         return selectedSites.Any(s => s.Id == site.Id);
+    }
+
+    private bool IsGroupSelected(SiteGroupDto group)
+    {
+        return selectedGroup?.Name == group.Name;
     }
 
     private void KeyDown(KeyboardEventArgs e)
@@ -440,6 +449,201 @@
         {
             isCtrlPressed = false;
         }
+    }
+
+    private void CloseMenu()
+    {
+        menuOpen = false;
+        StateHasChanged();
+    }
+
+    private async Task StartSite(SiteDto site)
+    {
+        try
+        {
+            await SiteService.StartSiteAsync(site.Name);
+            await RefreshSites();
+            Snackbar.Add($"Site '{site.Name}' iniciado com sucesso", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao iniciar site: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            CloseMenu();
+        }
+    }
+
+    private async Task StopSite(SiteDto site)
+    {
+        try
+        {
+            await SiteService.StopSiteAsync(site.Name);
+            await RefreshSites();
+            Snackbar.Add($"Site '{site.Name}' parado com sucesso", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao parar site: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            CloseMenu();
+        }
+    }
+
+    private async Task RestartSite(SiteDto site)
+    {
+        try
+        {
+            await SiteService.RestartSiteAsync(site.Name);
+            await RefreshSites();
+            Snackbar.Add($"Site '{site.Name}' reiniciado com sucesso", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao reiniciar site: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            CloseMenu();
+        }
+    }
+
+    private async Task CreateGroupFromSelected()
+    {
+        var parameters = new DialogParameters
+        {
+            { "AvailableSites", sites }
+        };
+
+        var dialog = await DialogService.ShowAsync<SiteGroupDialog>("Novo Grupo", parameters, dialogOptions);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is SiteGroupDto group)
+        {
+            try
+            {
+                await SiteService.CreateSiteGroupAsync(group);
+                await RefreshGroups();
+                Snackbar.Add($"Grupo '{group.Name}' criado com sucesso", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao criar grupo: {ex.Message}", Severity.Error);
+            }
+        }
+        CloseMenu();
+    }
+
+    private async Task EditGroup(SiteGroupDto group)
+    {
+        var parameters = new DialogParameters
+        {
+            { "IsEditing", true },
+            { "ExistingGroupName", group.Name },
+            { "AvailableSites", sites }
+        };
+
+        var dialog = await DialogService.ShowAsync<SiteGroupDialog>("Editar Grupo", parameters, dialogOptions);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is SiteGroupDto updatedGroup)
+        {
+            try
+            {
+                await SiteService.UpdateSiteGroupAsync(group.Name, updatedGroup);
+                await RefreshGroups();
+                Snackbar.Add($"Grupo '{group.Name}' atualizado com sucesso", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao atualizar grupo: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteGroup(SiteGroupDto group)
+    {
+        if (group == null) return;
+
+        var dialog = await DialogService.ShowMessageBox(
+            "Excluir Grupo",
+            $"Tem certeza que deseja excluir o grupo '{group.Name}'?" ,
+            yesText: "Sim", noText: "Não");
+
+        if (dialog == true)
+        {
+            try
+            {
+                await SiteService.DeleteSiteGroupAsync(group.Name);
+                await RefreshGroups();
+                Snackbar.Add($"Grupo '{group.Name}' excluído com sucesso", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir grupo: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task StartGroup(SiteGroupDto group)
+    {
+        try
+        {
+            await SiteService.StartSiteGroupAsync(group.Name);
+            await RefreshSites();
+            Snackbar.Add($"Todos os sites do grupo '{group.Name}' foram iniciados", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao iniciar sites do grupo: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StopGroup(SiteGroupDto group)
+    {
+        try
+        {
+            await SiteService.StopSiteGroupAsync(group.Name);
+            await RefreshSites();
+            Snackbar.Add($"Todos os sites do grupo '{group.Name}' foram parados", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao parar sites do grupo: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private List<SiteDto> GetGroupSites()
+    {
+        if (selectedGroup == null || sites == null) return new List<SiteDto>();
+        return sites.Where(s => selectedGroup.SiteNames.Contains(s.Name)).ToList();
+    }
+
+    private string GetSiteIcon(ObjectState state)
+    {
+        return state switch
+        {
+            ObjectState.Started => Icons.Material.Filled.PlayArrow,
+            ObjectState.Stopped => Icons.Material.Filled.Stop,
+            ObjectState.Starting => Icons.Material.Filled.Refresh,
+            ObjectState.Stopping => Icons.Material.Filled.Refresh,
+            _ => Icons.Material.Filled.Help
+        };
+    }
+
+    private Color GetSiteColor(ObjectState state)
+    {
+        return state switch
+        {
+            ObjectState.Started => Color.Success,
+            ObjectState.Stopped => Color.Error,
+            ObjectState.Starting => Color.Warning,
+            ObjectState.Stopping => Color.Warning,
+            _ => Color.Default
+        };
     }
 
     private async Task StartSelectedSites()
@@ -511,40 +715,6 @@
         }
     }
 
-    private string GetSiteIcon(ObjectState state)
-    {
-        return state switch
-        {
-            ObjectState.Started => Icons.Material.Filled.PlayArrow,
-            ObjectState.Stopped => Icons.Material.Filled.Stop,
-            _ => Icons.Material.Filled.HelpOutline
-        };
-    }
-
-    private Color GetSiteColor(ObjectState state)
-    {
-        return state switch
-        {
-            ObjectState.Started => Color.Success,
-            ObjectState.Stopped => Color.Error,
-            _ => Color.Warning
-        };
-    }
-
-    // Método simples para fechar o menu
-    private void CloseMenu()
-    {
-        menuOpen = false;
-        StateHasChanged();
-    }
-
-    // Método intermediário para lidar com o evento oncontextmenu
-    private void OnRightClickHandler(MouseEventArgs e)
-    {
-        _ = OnRightClick(e);
-    }
-
-    // Método para abrir o diálogo via DialogService
     private async Task OpenDialogViaService()
     {
         if (selectedSites.Count != 1) return;

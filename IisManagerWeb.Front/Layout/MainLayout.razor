@@ -38,7 +38,7 @@
 @code {
     private bool _drawerOpen = true;
     private bool _isDarkMode;
-    private MudThemeProvider _mudThemeProvider;
+    private MudThemeProvider _mudThemeProvider = null!;
     private void DrawerToggle()
     {
         _drawerOpen = !_drawerOpen;

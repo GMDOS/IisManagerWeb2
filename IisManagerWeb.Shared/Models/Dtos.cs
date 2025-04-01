@@ -32,4 +32,12 @@ public class BindingDto
     public string BindingInformation { get; set; } = string.Empty;
     public string Host { get; set; } = string.Empty;
     public string EndPoint { get; set; } = string.Empty;
+}
+
+public class SiteGroupDto
+{
+    public string Name { get; set; } = string.Empty;
+    public List<string> SiteNames { get; set; } = new();
+    public DateTime CreatedAt { get; set; }
+    public DateTime? LastModifiedAt { get; set; }
 } 

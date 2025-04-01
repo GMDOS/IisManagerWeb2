@@ -15,16 +15,10 @@
                             Disabled="@IsEditing"/>
                 
                 <MudText Class="mt-4">Sites no grupo:</MudText>
-                <MudList T="SiteSelection" Dense="true" Class="mt-2">
                     @foreach (var site in selectedSites)
                     {
-                        <MudListItem T="SiteSelection">
-                            <MudCheckBox T="bool" Checked="@site.IsSelected" 
-                                       CheckedChanged="@((value) => site.IsSelected = value)"
-                                       Label="@site.Name"/>
-                        </MudListItem>
+                        <MudCheckBox Class="mt-2" @bind-Value="@site.IsSelected" Label="@site.Name" />
                     }
-                </MudList>
                 
                 @if (!string.IsNullOrEmpty(errorMessage))
                 {
@@ -48,6 +42,7 @@
     [Parameter] public bool IsEditing { get; set; }
     [Parameter] public string? ExistingGroupName { get; set; }
     [Parameter] public List<SiteDto> AvailableSites { get; set; } = new();
+    [Parameter] public List<string> PreSelectedSiteNames { get; set; } = new();
     
     private string groupName = string.Empty;
     private string errorMessage = string.Empty;
@@ -59,18 +54,26 @@
         public bool IsSelected { get; set; }
     }
     
-    protected override void OnInitialized()
+    protected override void OnParametersSet()
     {
-        selectedSites = AvailableSites.Select(s => new SiteSelection 
-        { 
-            Name = s.Name,
-            IsSelected = false
+        var preSelectedSet = PreSelectedSiteNames?.ToHashSet(StringComparer.OrdinalIgnoreCase) 
+                           ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        selectedSites = AvailableSites.Select(s => {
+            bool isSelected = preSelectedSet.Contains(s.Name);
+            return new SiteSelection 
+            {
+                Name = s.Name,
+                IsSelected = isSelected 
+            };
         }).ToList();
-        
+
         if (IsEditing && !string.IsNullOrEmpty(ExistingGroupName))
         {
             groupName = ExistingGroupName;
         }
+        // Force UI update after parameters are set and selections calculated
+        InvokeAsync(StateHasChanged);
     }
     
     private void OnSiteSelectionChanged(SiteSelection site, bool value)

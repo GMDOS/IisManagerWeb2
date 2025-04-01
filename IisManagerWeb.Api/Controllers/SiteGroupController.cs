@@ -19,7 +19,7 @@ public static class SiteGroupController
                 return Results.Ok(new List<SiteGroupDto>());
 
             var json = File.ReadAllText(GroupsFilePath);
-            var groups = JsonSerializer.Deserialize<List<SiteGroupDto>>(json);
+            var groups = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.ListSiteGroupDto);
             return Results.Ok(groups);
         });
 
@@ -30,7 +30,7 @@ public static class SiteGroupController
                 return Results.NotFound();
 
             var json = File.ReadAllText(GroupsFilePath);
-            var groups = JsonSerializer.Deserialize<List<SiteGroupDto>>(json);
+            var groups = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.ListSiteGroupDto);
             var group = groups?.FirstOrDefault(g => g.Name == name);
             
             if (group == null)
@@ -47,7 +47,8 @@ public static class SiteGroupController
             if (File.Exists(GroupsFilePath))
             {
                 var json = File.ReadAllText(GroupsFilePath);
-                groups = JsonSerializer.Deserialize<List<SiteGroupDto>>(json) ?? new List<SiteGroupDto>();
+                groups = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.ListSiteGroupDto) 
+                         ?? new List<SiteGroupDto>();
             }
 
             if (groups.Any(g => g.Name == group.Name))
@@ -57,7 +58,7 @@ public static class SiteGroupController
             group.LastModifiedAt = DateTime.UtcNow;
             groups.Add(group);
 
-            var newJson = JsonSerializer.Serialize(groups);
+            var newJson = JsonSerializer.Serialize(groups, AppJsonSerializerContext.Default.ListSiteGroupDto);
             File.WriteAllText(GroupsFilePath, newJson);
 
             return Results.Ok(group);
@@ -70,7 +71,7 @@ public static class SiteGroupController
                 return Results.NotFound();
 
             var json = File.ReadAllText(GroupsFilePath);
-            var groups = JsonSerializer.Deserialize<List<SiteGroupDto>>(json);
+            var groups = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.ListSiteGroupDto);
             var existingGroup = groups?.FirstOrDefault(g => g.Name == name);
             
             if (existingGroup == null)
@@ -79,7 +80,7 @@ public static class SiteGroupController
             existingGroup.SiteNames = group.SiteNames;
             existingGroup.LastModifiedAt = DateTime.UtcNow;
 
-            var newJson = JsonSerializer.Serialize(groups);
+            var newJson = JsonSerializer.Serialize(groups, AppJsonSerializerContext.Default.ListSiteGroupDto);
             File.WriteAllText(GroupsFilePath, newJson);
 
             return Results.Ok(existingGroup);
@@ -92,14 +93,14 @@ public static class SiteGroupController
                 return Results.NotFound();
 
             var json = File.ReadAllText(GroupsFilePath);
-            var groups = JsonSerializer.Deserialize<List<SiteGroupDto>>(json);
+            var groups = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.ListSiteGroupDto);
             var group = groups?.FirstOrDefault(g => g.Name == name);
             
             if (group == null)
                 return Results.NotFound();
 
             groups.Remove(group);
-            var newJson = JsonSerializer.Serialize(groups);
+            var newJson = JsonSerializer.Serialize(groups, AppJsonSerializerContext.Default.ListSiteGroupDto);
             File.WriteAllText(GroupsFilePath, newJson);
 
             return Results.Ok();
@@ -112,7 +113,7 @@ public static class SiteGroupController
                 return Results.NotFound();
 
             var json = File.ReadAllText(GroupsFilePath);
-            var groups = JsonSerializer.Deserialize<List<SiteGroupDto>>(json);
+            var groups = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.ListSiteGroupDto);
             var group = groups?.FirstOrDefault(g => g.Name == name);
             
             if (group == null)
@@ -136,7 +137,7 @@ public static class SiteGroupController
                 return Results.NotFound();
 
             var json = File.ReadAllText(GroupsFilePath);
-            var groups = JsonSerializer.Deserialize<List<SiteGroupDto>>(json);
+            var groups = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.ListSiteGroupDto);
             var group = groups?.FirstOrDefault(g => g.Name == name);
             
             if (group == null)

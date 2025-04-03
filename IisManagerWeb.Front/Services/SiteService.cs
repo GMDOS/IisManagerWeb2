@@ -53,6 +53,46 @@ public class SiteService
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>
+    /// Verifica quais arquivos precisam ser atualizados no servidor
+    /// </summary>
+    /// <param name="name">Nome do site</param>
+    /// <param name="files">Lista de arquivos do cliente</param>
+    /// <returns>Lista de caminhos relativos de arquivos que precisam ser atualizados</returns>
+    public async Task<List<string>> CheckFilesForUpdateAsync(string name, List<ClientFileInfo> files)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"sites/{name}/check-files", files);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+    }
+    
+    /// <summary>
+    /// Atualiza apenas os arquivos específicos no servidor
+    /// </summary>
+    /// <param name="name">Nome do site</param>
+    /// <param name="files">Dicionário com o caminho relativo do arquivo e o conteúdo</param>
+    /// <param name="filesLastModified">Dicionário opcional com as datas de modificação dos arquivos</param>
+    public async Task UpdateSpecificFilesAsync(string name, Dictionary<string, Stream> files, Dictionary<string, DateTime>? filesLastModified = null)
+    {
+        using var content = new MultipartFormDataContent();
+        
+        foreach (var file in files)
+        {
+            var streamContent = new StreamContent(file.Value);
+            content.Add(streamContent, "files", file.Key);
+            
+            // Se tiver a data de modificação do arquivo, adiciona ao formulário
+            if (filesLastModified != null && filesLastModified.TryGetValue(file.Key, out var lastModified))
+            {
+                // Adiciona a data de modificação como um campo adicional no formulário
+                content.Add(new StringContent(lastModified.ToString("o")), $"lastModified_{file.Key}");
+            }
+        }
+        
+        var response = await _httpClient.PostAsync($"sites/{name}/update-specific-files", content);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<List<SiteGroupDto>> GetSiteGroupsAsync()
     {
         return await _httpClient.GetFromJsonAsync<List<SiteGroupDto>>("site-groups") ?? new List<SiteGroupDto>();

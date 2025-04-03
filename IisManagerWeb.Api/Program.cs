@@ -49,6 +49,8 @@ if (!PrivilegeHelper.IsRunningAsAdministrator())
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
+    options.SerializerOptions.PropertyNameCaseInsensitive = true;
+    options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 });
 
 var app = builder.Build();
@@ -76,6 +78,12 @@ app.Run();
 [JsonSerializable(typeof(ObjectState))]
 [JsonSerializable(typeof(List<SiteGroupDto>))]
 [JsonSerializable(typeof(SiteGroupDto))]
+[JsonSerializable(typeof(List<ClientFileInfo>))]
+[JsonSerializable(typeof(List<ClientFileInfo?>))]
+[JsonSerializable(typeof(ClientFileInfo))]
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(DateTime?))]
+[JsonSerializable(typeof(List<string>))]
 internal partial class AppJsonSerializerContext : JsonSerializerContext
 {
 }

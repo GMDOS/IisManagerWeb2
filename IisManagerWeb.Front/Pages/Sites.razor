@@ -4,6 +4,9 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor.Services
 @using IisManagerWeb.Front.Components
+@using IisManagerWeb.Shared.Models
+@using MudBlazor
+@using IisManagerWeb.Front.Services
 @inject SiteService SiteService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -77,6 +80,11 @@
                                                 <MudMenuItem OnClick="@OpenDialogViaService">
                                                     <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2" />
                                                     Atualizar Arquivos
+                                                </MudMenuItem>
+                                                
+                                                <MudMenuItem OnClick="@OpenFolderDialog">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Folder" Class="mr-2" />
+                                                    Atualizar por Pasta
                                                 </MudMenuItem>
                                             }
                                         </ChildContent>
@@ -727,6 +735,58 @@
 
             // Abre o diálogo através do serviço, com await para garantir que o diálogo está pronto
             var dialog = await DialogService.ShowAsync<UpdateFilesDialog>("", parameters, options);
+
+            try
+            {
+                // Aguarda o resultado do diálogo
+                await dialog.Result;
+            }
+            catch (Exception)
+            {
+                // Ignora erros no resultado do diálogo
+            }
+            finally
+            {
+                // Atualiza os sites independente do resultado
+                await RefreshSites();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao processar diálogo: {ex.Message}", Severity.Error);
+            await RefreshSites();
+        }
+    }
+
+    private async Task OpenFolderDialog()
+    {
+        if (selectedSites.Count != 1) return;
+
+        // Fechamos o menu antes de abrir o diálogo
+        CloseMenu();
+
+        try
+        {
+            // Limpar possíveis diálogos pendentes
+            await Task.Delay(100);
+
+            // Parâmetros para o diálogo
+            var parameters = new DialogParameters
+            {
+                ["SiteName"] = selectedSites[0].Name
+            };
+
+            // Configurações do diálogo - configurações mínimas para reduzir problemas
+            var options = new DialogOptions
+            {
+                CloseOnEscapeKey = true,
+                FullWidth = false,
+                MaxWidth = MaxWidth.ExtraSmall,
+                NoHeader = true
+            };
+
+            // Abre o diálogo através do serviço, com await para garantir que o diálogo está pronto
+            var dialog = await DialogService.ShowAsync<UpdateFolderDialog>("", parameters, options);
 
             try
             {

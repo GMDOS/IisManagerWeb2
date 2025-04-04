@@ -231,6 +231,28 @@ public static class SiteController
                     return Results.BadRequest("Caminho físico do site não encontrado");
                 }
                 
+                // Carregar as configurações para obter os padrões de arquivos ignorados
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ManagerSettings.json");
+                List<string> ignoredPatterns = new List<string>();
+                
+                if (File.Exists(settingsPath))
+                {
+                    try
+                    {
+                        var settingsJson = File.ReadAllText(settingsPath);
+                        var settings = JsonSerializer.Deserialize(settingsJson, AppJsonSerializerContext.Default.ManagerSettings);
+                        if (settings != null && settings.IgnoredFiles.Count > 0)
+                        {
+                            ignoredPatterns = settings.IgnoredFiles;
+                            Console.WriteLine($"Aplicando {ignoredPatterns.Count} padrões de arquivos ignorados");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erro ao carregar configurações: {ex.Message}");
+                    }
+                }
+
                 // Deserializar a lista de arquivos enviada pelo cliente
                 
                 List<ClientFileInfo>? clientFiles = null;
@@ -250,25 +272,31 @@ public static class SiteController
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Erro na deserialização: {ex.Message}");
-                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                    return Results.BadRequest($"Erro ao deserializar arquivos: {ex.Message}");
+                    Console.WriteLine($"Erro ao deserializar a lista de arquivos: {ex.Message} - {ex.StackTrace}");
+                    return Results.BadRequest("Erro ao deserializar a lista de arquivos enviada pelo cliente");
                 }
                 
-                if (clientFiles == null)    
+                if (clientFiles == null || clientFiles.Count == 0)
                 {
-                    Console.WriteLine("Lista de arquivos inválida");
-                    return Results.BadRequest("Lista de arquivos inválida");
+                    Console.WriteLine("Nenhum arquivo enviado pelo cliente");
+                    return Results.Ok(new List<string>());
                 }
                 
-                // Lista de arquivos que precisam ser atualizados
+                // Lista para armazenar os arquivos que precisam ser atualizados
                 var filesToUpdate = new List<string>();
-                Console.WriteLine($"Lista de arquivos que precisam ser atualizados: {string.Join(", ", filesToUpdate)}");
-                // Para cada arquivo no cliente, verificar se ele existe no servidor e se é mais recente
+                
+                // Verificar cada arquivo do cliente
                 foreach (var clientFile in clientFiles)
                 {
                     Console.WriteLine($"Verificando arquivo: {clientFile.RelativePath} - {clientFile.IsDirectory} - {clientFile.LastModified}");
                     var relativePath = clientFile.RelativePath;
+                    
+                    // Verificar se o arquivo deve ser ignorado com base nos padrões configurados
+                    if (ShouldIgnoreFile(relativePath, ignoredPatterns))
+                    {
+                        Console.WriteLine($"Arquivo ignorado de acordo com as regras configuradas: {relativePath}");
+                        continue;
+                    }
                     
                     // Se for um diretório, verificamos se ele existe no servidor
                     if (clientFile.IsDirectory)
@@ -309,6 +337,28 @@ public static class SiteController
                 if (string.IsNullOrEmpty(physicalPath))
                     return Results.BadRequest("Caminho físico do site não encontrado");
                 
+                // Carregar as configurações para obter os padrões de arquivos ignorados
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ManagerSettings.json");
+                List<string> ignoredPatterns = new List<string>();
+                
+                if (File.Exists(settingsPath))
+                {
+                    try
+                    {
+                        var settingsJson = File.ReadAllText(settingsPath);
+                        var settings = JsonSerializer.Deserialize(settingsJson, AppJsonSerializerContext.Default.ManagerSettings);
+                        if (settings != null && settings.IgnoredFiles.Count > 0)
+                        {
+                            ignoredPatterns = settings.IgnoredFiles;
+                            Console.WriteLine($"Aplicando {ignoredPatterns.Count} padrões de arquivos ignorados");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erro ao carregar configurações: {ex.Message}");
+                    }
+                }
+                
                 // Parar o site antes de atualizar os arquivos
                 if (site.State == ObjectState.Started)
                     site.Stop();
@@ -326,46 +376,50 @@ public static class SiteController
                 // Primeiro identificamos todos os diretórios necessários
                 foreach (var file in files)
                 {
-                    var destPath = Path.Combine(physicalPath, file.FileName);
-                    var dirName = Path.GetDirectoryName(destPath);
+                    // Verificar se o arquivo deve ser ignorado com base nos padrões configurados
+                    if (ShouldIgnoreFile(file.FileName, ignoredPatterns))
+                    {
+                        Console.WriteLine($"Arquivo ignorado de acordo com as regras configuradas: {file.FileName}");
+                        continue;
+                    }
                     
-                    if (!string.IsNullOrEmpty(dirName))
+                    var dirPath = Path.GetDirectoryName(Path.Combine(physicalPath, file.FileName));
+                    if (!string.IsNullOrEmpty(dirPath))
                     {
-                        directories.Add(dirName);
+                        directories.Add(dirPath);
                     }
                 }
                 
-                // Criamos todos os diretórios necessários
-                foreach (var directory in directories)
+                // Criar diretórios necessários
+                foreach (var dir in directories)
                 {
-                    if (!Directory.Exists(directory))
+                    if (!Directory.Exists(dir))
                     {
-                        try
-                        {
-                            Directory.CreateDirectory(directory);
-                            Console.WriteLine($"Diretório criado: {directory}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Erro ao criar diretório {directory}: {ex.Message}");
-                        }
+                        Directory.CreateDirectory(dir);
                     }
                 }
                 
-                // Agora salvamos os arquivos
+                // Agora, copiamos os arquivos
                 foreach (var file in files)
                 {
+                    // Verificar se o arquivo deve ser ignorado com base nos padrões configurados
+                    if (ShouldIgnoreFile(file.FileName, ignoredPatterns))
+                    {
+                        continue;
+                    }
+                    
                     var destPath = Path.Combine(physicalPath, file.FileName);
                     
                     using var stream = new FileStream(destPath, FileMode.Create);
                     await file.CopyToAsync(stream);
                     
                     // Obter data e hora original do arquivo a partir dos headers do formulário
-                    if (form.TryGetValue($"lastModified_{file.Name}", out var lastModifiedValues) && 
-                        lastModifiedValues.Count > 0 && 
-                        DateTime.TryParse(lastModifiedValues[0], out var lastModified))
+                    var hasValue = form.TryGetValue($"lastModified_{file.FileName}", out var lastModifiedValues);
+                    
+                    if (hasValue && lastModifiedValues.Count > 0 && DateTime.TryParse(lastModifiedValues[0], out var lastModified))
                     {
-                        // Aplicar a data de modificação original ao arquivo
+                        Console.WriteLine($"Data de modificação original: {lastModified}");
+                        Console.WriteLine($"Data de modificação original: {lastModified.ToLocalTime()}");
                         File.SetLastWriteTime(destPath, lastModified);
                     }
                 }
@@ -380,5 +434,213 @@ public static class SiteController
                 return Results.BadRequest($"Erro ao atualizar os arquivos do site: {ex.Message}");
             }
         });
+        
+        // Atualizar arquivos em múltiplos sites
+        siteApi.MapPost("/update-multiple", async (HttpRequest request) =>
+        {
+            try
+            {
+                // Processar o formulário multipart
+                var form = await request.ReadFormAsync();
+                var files = form.Files;
+                
+                if (files.Count == 0)
+                    return Results.BadRequest("Nenhum arquivo enviado");
+                
+                // Obter os nomes dos sites do formulário
+                var siteNames = new List<string>();
+                for (int i = 0; ; i++)
+                {
+                    if (form.TryGetValue($"siteNames[{i}]", out var siteName) && siteName.Count > 0)
+                    {
+                        siteNames.Add(siteName[0]);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                
+                if (siteNames.Count == 0)
+                    return Results.BadRequest("Nenhum site especificado");
+                
+                Console.WriteLine($"Sites a serem atualizados: {string.Join(", ", siteNames)}");
+                
+                // Carregar as configurações para obter os padrões de arquivos ignorados
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ManagerSettings.json");
+                List<string> ignoredPatterns = new List<string>();
+                
+                if (File.Exists(settingsPath))
+                {
+                    try
+                    {
+                        var settingsJson = File.ReadAllText(settingsPath);
+                        var settings = JsonSerializer.Deserialize(settingsJson, AppJsonSerializerContext.Default.ManagerSettings);
+                        if (settings != null && settings.IgnoredFiles.Count > 0)
+                        {
+                            ignoredPatterns = settings.IgnoredFiles;
+                            Console.WriteLine($"Aplicando {ignoredPatterns.Count} padrões de arquivos ignorados");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erro ao carregar configurações: {ex.Message}");
+                    }
+                }
+                
+                var sitesAtualizados = 0;
+                var sitesComErro = new List<string>();
+                
+                using var serverManager = new ServerManager();
+                
+                // Para cada site, atualize os arquivos
+                foreach (var siteName in siteNames)
+                {
+                    try
+                    {
+                        var site = serverManager.Sites[siteName];
+                        if (site == null)
+                        {
+                            Console.WriteLine($"Site não encontrado: {siteName}");
+                            sitesComErro.Add(siteName);
+                            continue;
+                        }
+                        
+                        // Obter o caminho físico do site
+                        var physicalPath = site.Applications["/"].VirtualDirectories["/"].PhysicalPath;
+                        if (string.IsNullOrEmpty(physicalPath))
+                        {
+                            Console.WriteLine($"Caminho físico não encontrado para o site: {siteName}");
+                            sitesComErro.Add(siteName);
+                            continue;
+                        }
+                        
+                        // Parar o site antes de atualizar os arquivos
+                        var siteWasRunning = false;
+                        if (site.State == ObjectState.Started)
+                        {
+                            siteWasRunning = true;
+                            site.Stop();
+                        }
+                        
+                        // Lista para armazenar os diretórios que precisam ser criados
+                        var directories = new HashSet<string>();
+                        
+                        // Primeiro identificamos todos os diretórios necessários
+                        foreach (var file in files)
+                        {
+                            // Verificar se o arquivo deve ser ignorado com base nos padrões configurados
+                            if (ShouldIgnoreFile(file.FileName, ignoredPatterns))
+                            {
+                                Console.WriteLine($"Arquivo ignorado de acordo com as regras configuradas: {file.FileName}");
+                                continue;
+                            }
+                            
+                            var dirPath = Path.GetDirectoryName(Path.Combine(physicalPath, file.FileName));
+                            if (!string.IsNullOrEmpty(dirPath))
+                            {
+                                directories.Add(dirPath);
+                            }
+                        }
+                        
+                        // Criar diretórios necessários
+                        foreach (var dir in directories)
+                        {
+                            if (!Directory.Exists(dir))
+                            {
+                                Directory.CreateDirectory(dir);
+                            }
+                        }
+                        
+                        // Agora, copiamos os arquivos
+                        foreach (var file in files)
+                        {
+                            // Verificar se o arquivo deve ser ignorado com base nos padrões configurados
+                            if (ShouldIgnoreFile(file.FileName, ignoredPatterns))
+                            {
+                                continue;
+                            }
+                            
+                            var destPath = Path.Combine(physicalPath, file.FileName);
+                            
+                            // Para cada arquivo, precisamos abrir um novo stream porque já foi lido para o site anterior
+                            file.OpenReadStream().Seek(0, SeekOrigin.Begin);
+                            
+                            using var stream = new FileStream(destPath, FileMode.Create);
+                            await file.CopyToAsync(stream);
+                            
+                            // Obter data e hora original do arquivo a partir dos headers do formulário
+                            var hasValue = form.TryGetValue($"lastModified_{file.FileName}", out var lastModifiedValues);
+                            
+                            if (hasValue && lastModifiedValues.Count > 0)
+                            {
+                                if (DateTime.TryParse(lastModifiedValues[0], out var lastModified))
+                                {
+                                    // Aplicar a data de modificação original ao arquivo
+                                    File.SetLastWriteTime(destPath, lastModified);
+                                }
+                            }
+                        }
+                        
+                        // Iniciar o site novamente se estava rodando antes
+                        if (siteWasRunning)
+                        {
+                            site.Start();
+                        }
+                        
+                        sitesAtualizados++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erro ao atualizar o site {siteName}: {ex.Message}");
+                        sitesComErro.Add(siteName);
+                    }
+                }
+                
+                if (sitesComErro.Count > 0)
+                {
+                    return Results.BadRequest($"Alguns sites apresentaram erros durante a atualização: {string.Join(", ", sitesComErro)}. " +
+                                              $"Sites atualizados com sucesso: {sitesAtualizados} de {siteNames.Count}.");
+                }
+                
+                return Results.Ok($"{sitesAtualizados} site(s) atualizado(s) com sucesso");
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest($"Erro ao atualizar os sites: {ex.Message}");
+            }
+        });
+    }
+
+    // Função auxiliar para verificar se um arquivo deve ser ignorado
+    private static bool ShouldIgnoreFile(string filePath, List<string> ignoredPatterns)
+    {
+        if (ignoredPatterns.Count == 0)
+            return false;
+        
+        // Converter barras para o formato universal para maior compatibilidade
+        filePath = filePath.Replace('\\', '/');
+        
+        foreach (var pattern in ignoredPatterns)
+        {
+            // Padrão exato
+            if (pattern == filePath)
+                return true;
+            
+            // Padrão com wildcard no final (ex: "logs/*")
+            if (pattern.EndsWith("/*") && filePath.StartsWith(pattern.TrimEnd('*')))
+                return true;
+            
+            // Padrão com wildcard no início (ex: "*.log")
+            if (pattern.StartsWith("*") && filePath.EndsWith(pattern.TrimStart('*')))
+                return true;
+            
+            // Padrão com wildcards em ambos os lados (ex: "*.min.*")
+            if (pattern.StartsWith("*") && pattern.EndsWith("*") && 
+                pattern.Length > 2 && filePath.Contains(pattern.Trim('*')))
+                return true;
+        }
+        
+        return false;
     }
 }

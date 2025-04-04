@@ -134,4 +134,38 @@ public class SiteService
         var response = await _httpClient.PostAsync($"site-groups/{name}/stop", null);
         response.EnsureSuccessStatusCode();
     }
+
+    /// <summary>
+    /// Atualiza arquivos específicos em um grupo de sites
+    /// </summary>
+    /// <param name="siteNames">Lista de nomes dos sites a serem atualizados</param>
+    /// <param name="files">Dicionário com o caminho relativo do arquivo e o conteúdo</param>
+    /// <param name="filesLastModified">Dicionário opcional com as datas de modificação dos arquivos</param>
+    public async Task UpdateSpecificFilesInMultipleSitesAsync(List<string> siteNames, Dictionary<string, Stream> files, Dictionary<string, DateTime>? filesLastModified = null)
+    {
+        using var content = new MultipartFormDataContent();
+        
+        // Adiciona os nomes dos sites ao formulário
+        for (int i = 0; i < siteNames.Count; i++)
+        {
+            content.Add(new StringContent(siteNames[i]), $"siteNames[{i}]");
+        }
+        
+        // Adiciona os arquivos ao formulário
+        foreach (var file in files)
+        {
+            var streamContent = new StreamContent(file.Value);
+            content.Add(streamContent, "files", file.Key);
+            
+            // Se tiver a data de modificação do arquivo, adiciona ao formulário
+            if (filesLastModified != null && filesLastModified.TryGetValue(file.Key, out var lastModified))
+            {
+                // Adiciona a data de modificação como um campo adicional no formulário
+                content.Add(new StringContent(lastModified.ToString("o")), $"lastModified_{file.Key}");
+            }
+        }
+        
+        var response = await _httpClient.PostAsync($"sites/update-multiple", content);
+        response.EnsureSuccessStatusCode();
+    }
 } 

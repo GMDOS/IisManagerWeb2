@@ -5,6 +5,7 @@ using System.Diagnostics;
 using Microsoft.Web.Administration;
 using IisManagerWeb.Shared.Models;
 using System.Collections.Generic;
+using IisManagerWeb.Api.Services;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
@@ -53,13 +54,23 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 });
 
+// Adicionar serviços de monitoramento
+builder.Services.AddSingleton<ServerMonitorService>();
+builder.Services.AddHostedService<ServerMonitorBackgroundService>();
+
 var app = builder.Build();
 
-// Habilitar CORS
+// Habilitar CORS e WebSockets
 app.UseCors();
+app.UseWebSockets(new WebSocketOptions
+{
+    KeepAliveInterval = TimeSpan.FromSeconds(30)
+});
 
 app.GetSiteRoutes();
 app.GetSiteGroupRoutes();
+app.GetSettingsRoutes();
+app.GetMetricsRoutes();
 
 app.Run();
 
@@ -84,6 +95,13 @@ app.Run();
 [JsonSerializable(typeof(DateTime))]
 [JsonSerializable(typeof(DateTime?))]
 [JsonSerializable(typeof(List<string>))]
+[JsonSerializable(typeof(ManagerSettings))]
+[JsonSerializable(typeof(ServerMetrics))]
+[JsonSerializable(typeof(List<ServerMetrics>))]
+[JsonSerializable(typeof(ServerMetricsHistory))]
+[JsonSerializable(typeof(SiteMetrics))]
+[JsonSerializable(typeof(List<SiteMetrics>))]
+[JsonSerializable(typeof(MetricsWebSocketPacket))]
 internal partial class AppJsonSerializerContext : JsonSerializerContext
 {
 }

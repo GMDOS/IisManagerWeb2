@@ -13,5 +13,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("http://localhost:5135/") });
 builder.Services.AddScoped<SiteService>();
 builder.Services.AddScoped<IUploadFileService, UploadFileService>();
+builder.Services.AddScoped<SettingsService>();
+builder.Services.AddScoped<MetricsService>();
 
 await builder.Build().RunAsync();

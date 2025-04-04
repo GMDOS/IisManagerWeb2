@@ -1,108 +1,304 @@
 @page "/dashboard"
+@using IisManagerWeb.Shared.Models
+@using IisManagerWeb.Front.Services
+@using System.Globalization
+@inject MetricsService MetricsService
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
 
 <PageTitle>Dashboard</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h3" GutterBottom="true">Dashboard de Monitoramento</MudText>
+    
+    <MudGrid>
+        <!-- Cards de Estatísticas -->
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                <MudText Typo="Typo.h6" Class="mb-2">CPU</MudText>
+                <MudProgressCircular Size="Size.Large" Color="@GetCpuColor(_currentMetrics?.CpuUsage ?? 0)"
+                                    Value="@(_currentMetrics?.CpuUsage ?? 0)" Min="0" Max="100" Class="my-2">
+                    <MudText Typo="Typo.h5">@($"{_currentMetrics?.CpuUsage ?? 0:F1}%")</MudText>
+                </MudProgressCircular>
+                <MudText Typo="Typo.body2">Utilização da CPU</MudText>
+            </MudPaper>
+        </MudItem>
+        
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                <MudText Typo="Typo.h6" Class="mb-2">Memória</MudText>
+                <MudProgressCircular Size="Size.Large" Color="@GetMemoryColor(_currentMetrics?.MemoryUsage ?? 0)" 
+                                    Value="@(_currentMetrics?.MemoryUsage ?? 0)" Min="0" Max="100" Class="my-2">
+                    <MudText Typo="Typo.h5">@($"{_currentMetrics?.MemoryUsage ?? 0:F1}%")</MudText>
+                </MudProgressCircular>
+                <MudText Typo="Typo.body2">Utilização da Memória</MudText>
+                <MudText Typo="Typo.caption">@($"Livre: {_currentMetrics?.AvailableMemory ?? 0:F0} MB / Total: {_currentMetrics?.TotalMemory ?? 0:F0} MB")</MudText>
+            </MudPaper>
+        </MudItem>
+        
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                <MudText Typo="Typo.h6" Class="mb-2">Requisições</MudText>
+                <MudText Typo="Typo.h4" Style="line-height: 80px">@($"{_currentMetrics?.RequestsPerSecond ?? 0:F1}")</MudText>
+                <MudText Typo="Typo.body2">Requisições por segundo</MudText>
+            </MudPaper>
+        </MudItem>
+        
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                <MudText Typo="Typo.h6" Class="mb-2">Conexões</MudText>
+                <MudText Typo="Typo.h4" Style="line-height: 80px">@(_currentMetrics?.ActiveConnections ?? 0)</MudText>
+                <MudText Typo="Typo.body2">Conexões ativas</MudText>
+            </MudPaper>
+        </MudItem>
+        
+        <!-- Gráficos -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="2" Class="pa-4 chart-container">
+                <MudText Typo="Typo.h6" Class="mb-4">Utilização de CPU (Última Hora)</MudText>
+                @if (_metricsHistory?.Metrics != null && _metricsHistory.Metrics.Any())
+                {
+                    <div style="height: 300px;">
+                        <MudChart ChartType="ChartType.Line" ChartSeries="@_cpuSeries" XAxisLabels="@_timeLabels" 
+                                 Width="100%" Height="300px"></MudChart>
+                    </div>
+                }
+                else
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Typo="Typo.caption">Carregando dados do histórico...</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+        
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="2" Class="pa-4 chart-container">
+                <MudText Typo="Typo.h6" Class="mb-4">Utilização de Memória (Última Hora)</MudText>
+                @if (_metricsHistory?.Metrics != null && _metricsHistory.Metrics.Any())
+                {
+                    <div style="height: 300px;">
+                        <MudChart ChartType="ChartType.Line" ChartSeries="@_memorySeries" XAxisLabels="@_timeLabels" 
+                                 Width="100%" Height="300px"></MudChart>
+                    </div>
+                }
+                else
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Typo="Typo.caption">Carregando dados do histórico...</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+        
+        <!-- Tabela de Sites -->
+        <MudItem xs="12">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-4">Sites Ativos</MudText>
+                
+                <MudTable Items="@_siteMetrics" Dense="true" Hover="true" Bordered="true" Striped="true" Loading="@(_siteMetrics == null)">
+                    <HeaderContent>
+                        <MudTh>Site</MudTh>
+                        <MudTh>Requisições/s</MudTh>
+                        <MudTh>Conexões Ativas</MudTh>
+                        <MudTh>Recebido (KB/s)</MudTh>
+                        <MudTh>Enviado (KB/s)</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Site">@context.SiteName</MudTd>
+                        <MudTd DataLabel="Requisições/s">@context.RequestsPerSecond.ToString("F2")</MudTd>
+                        <MudTd DataLabel="Conexões Ativas">@context.ActiveConnections</MudTd>
+                        <MudTd DataLabel="Recebido (KB/s)">@((context.BytesReceivedPerSecond / 1024).ToString("F2"))</MudTd>
+                        <MudTd DataLabel="Enviado (KB/s)">@((context.BytesSentPerSecond / 1024).ToString("F2"))</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText>Nenhum site ativo encontrado</MudText>
+                    </NoRecordsContent>
+                    <LoadingContent>
+                        <MudText>Carregando...</MudText>
+                    </LoadingContent>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+        
+        <MudItem xs="12" Class="d-flex justify-center mt-2">
+            <MudText Typo="Typo.caption">
+                Atualização a cada @_refreshInterval segundos | Última atualização: @(_currentMetrics?.Timestamp.ToLocalTime().ToString("HH:mm:ss") ?? "Nunca")
+            </MudText>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
 
-<MudGrid>
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4" Style="height: 200px;">
-            <MudText Typo="Typo.h5">Servidores</MudText>
-            <MudDivider Class="my-2"/>
-            <MudText Typo="Typo.h3">5</MudText>
-            <MudText Typo="Typo.body2">Total de servidores monitorados</MudText>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4" Style="height: 200px;">
-            <MudText Typo="Typo.h5">Sites</MudText>
-            <MudDivider Class="my-2"/>
-            <MudText Typo="Typo.h3">15</MudText>
-            <MudText Typo="Typo.body2">Total de sites ativos</MudText>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4" Style="height: 200px;">
-            <MudText Typo="Typo.h5">Aplicações</MudText>
-            <MudDivider Class="my-2"/>
-            <MudText Typo="Typo.h3">32</MudText>
-            <MudText Typo="Typo.body2">Total de aplicações</MudText>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4" Style="height: 200px;">
-            <MudText Typo="Typo.h5">Estado</MudText>
-            <MudDivider Class="my-2"/>
-            <MudText Typo="Typo.h3" Color="Color.Success">Online</MudText>
-            <MudText Typo="Typo.body2">Status atual do sistema</MudText>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
-
-<MudGrid Class="mt-4">
-    <MudItem xs="12" md="6">
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudText Typo="Typo.h5">Uso de Recursos</MudText>
-            <MudChart ChartType="ChartType.Line" ChartSeries="@Series" XAxisLabels="@XAxisLabels" Width="100%" Height="300px"></MudChart>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" md="6">
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudText Typo="Typo.h5">Sites Mais Visitados</MudText>
-            <MudSimpleTable Style="overflow-x: auto;">
-                <thead>
-                    <tr>
-                        <th>Site</th>
-                        <th>Requisições</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var site in TopSites)
-                    {
-                        <tr>
-                            <td>@site.Name</td>
-                            <td>@site.Requests</td>
-                            <td>
-                                @if (site.Status == "Online")
-                                {
-                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">@site.Status</MudChip>
-                                }
-                                else
-                                {
-                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">@site.Status</MudChip>
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </MudSimpleTable>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+<style>
+    .chart-container {
+        position: relative;
+        min-height: 350px;
+    }
+</style>
 
 @code {
-    private List<ChartSeries> Series = new List<ChartSeries>
+    private ServerMetrics? _currentMetrics;
+    private List<SiteMetrics>? _siteMetrics;
+    private ServerMetricsHistory? _metricsHistory;
+    private List<ChartSeries> _cpuSeries = new();
+    private List<ChartSeries> _memorySeries = new();
+    private string[] _timeLabels = Array.Empty<string>();
+    private int _refreshInterval = 30;
+    private bool _isConnected;
+    
+    protected override async Task OnInitializedAsync()
     {
-        new ChartSeries() { Name = "CPU", Data = new double[] { 30, 45, 25, 60, 75, 45, 30 } },
-        new ChartSeries() { Name = "Memória", Data = new double[] { 60, 70, 65, 55, 75, 80, 70 } }
-    };
-
-    private string[] XAxisLabels = { "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom" };
-
-    private List<SiteInfo> TopSites = new List<SiteInfo>
+        try 
+        {
+            // Registrar callbacks para receber atualizações
+            MetricsService.OnMetricsUpdate(HandleMetricsUpdate);
+            MetricsService.OnSiteMetricsUpdate(HandleSiteMetricsUpdate);
+            MetricsService.OnRefreshIntervalUpdate(HandleRefreshIntervalUpdate);
+            
+            // Carregar histórico de métricas
+            _metricsHistory = await MetricsService.GetMetricsHistoryAsync();
+            UpdateChartData();
+            
+            // Conectar ao WebSocket para receber atualizações em tempo real
+            await ConnectToWebSocketAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao inicializar dashboard: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Atualiza os dados do gráfico com base no histórico
+    /// </summary>
+    private void UpdateChartData()
     {
-        new SiteInfo { Name = "portal.exemplo.com", Requests = 15432, Status = "Online" },
-        new SiteInfo { Name = "app.exemplo.com", Requests = 12345, Status = "Online" },
-        new SiteInfo { Name = "blog.exemplo.com", Requests = 8765, Status = "Online" },
-        new SiteInfo { Name = "intranet.exemplo.com", Requests = 5432, Status = "Offline" },
-        new SiteInfo { Name = "api.exemplo.com", Requests = 4321, Status = "Online" }
-    };
-
-    public class SiteInfo
+        if (_metricsHistory?.Metrics == null || !_metricsHistory.Metrics.Any())
+            return;
+        
+        // Ordenar métricas por timestamp
+        var metrics = _metricsHistory.Metrics.OrderBy(m => m.Timestamp).ToList();
+        
+        // Criar labels de tempo (hora:minuto)
+        _timeLabels = metrics.Select(m => m.Timestamp.ToLocalTime().ToString("HH:mm")).ToArray();
+        
+        // Criar série para CPU
+        _cpuSeries = new List<ChartSeries>
+        {
+            new ChartSeries
+            {
+                Name = "CPU (%)",
+                Data = metrics.Select(m => (double)m.CpuUsage).ToArray()
+            }
+        };
+        
+        // Criar série para Memória
+        _memorySeries = new List<ChartSeries>
+        {
+            new ChartSeries
+            {
+                Name = "Memória (%)",
+                Data = metrics.Select(m => (double)m.MemoryUsage).ToArray()
+            }
+        };
+    }
+    
+    /// <summary>
+    /// Conecta ao WebSocket para receber atualizações em tempo real
+    /// </summary>
+    private async Task ConnectToWebSocketAsync()
     {
-        public string Name { get; set; } = string.Empty;
-        public int Requests { get; set; }
-        public string Status { get; set; } = string.Empty;
+        if (_isConnected)
+            return;
+        
+        try
+        {
+            await MetricsService.ConnectToWebSocketAsync();
+            _isConnected = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao conectar ao WebSocket: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Manipula atualizações de métricas do servidor
+    /// </summary>
+    private void HandleMetricsUpdate(ServerMetrics metrics)
+    {
+        _currentMetrics = metrics;
+        
+        // Adicionar ao histórico local para atualizar os gráficos
+        if (_metricsHistory != null)
+        {
+            _metricsHistory.Metrics.Add(metrics);
+            
+            // Manter apenas a última hora
+            var cutoffTime = DateTime.UtcNow.AddHours(-1);
+            _metricsHistory.Metrics = _metricsHistory.Metrics
+                .Where(m => m.Timestamp >= cutoffTime)
+                .OrderBy(m => m.Timestamp)
+                .ToList();
+            
+            UpdateChartData();
+        }
+        
+        StateHasChanged();
+    }
+    
+    /// <summary>
+    /// Manipula atualizações de métricas de sites
+    /// </summary>
+    private void HandleSiteMetricsUpdate(List<SiteMetrics> siteMetrics)
+    {
+        _siteMetrics = siteMetrics;
+        StateHasChanged();
+    }
+    
+    /// <summary>
+    /// Manipula atualizações do intervalo de atualização
+    /// </summary>
+    private void HandleRefreshIntervalUpdate(int refreshInterval)
+    {
+        _refreshInterval = refreshInterval;
+        StateHasChanged();
+    }
+    
+    /// <summary>
+    /// Determina a cor do indicador de CPU com base na utilização
+    /// </summary>
+    private Color GetCpuColor(double cpuUsage)
+    {
+        return cpuUsage switch
+        {
+            >= 90 => Color.Error,
+            >= 70 => Color.Warning,
+            >= 30 => Color.Info,
+            _ => Color.Success
+        };
+    }
+    
+    /// <summary>
+    /// Determina a cor do indicador de memória com base na utilização
+    /// </summary>
+    private Color GetMemoryColor(double memoryUsage)
+    {
+        return memoryUsage switch
+        {
+            >= 90 => Color.Error,
+            >= 70 => Color.Warning,
+            >= 50 => Color.Info,
+            _ => Color.Success
+        };
+    }
+    
+    /// <summary>
+    /// Desconecta o WebSocket quando a página é descartada
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_isConnected)
+        {
+            await MetricsService.DisconnectAsync();
+        }
     }
 } 

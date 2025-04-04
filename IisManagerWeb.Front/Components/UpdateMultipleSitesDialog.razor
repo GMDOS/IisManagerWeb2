@@ -7,22 +7,67 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
 @rendermode RenderMode.InteractiveWebAssembly
+@using Microsoft.AspNetCore.Components
 
 <MudDialog>
     <DialogContent>
-        <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4">Atualizar Arquivos do Site @SiteName</MudText>
+        <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4">
+            @if (PreSelectedSiteNames != null)
+            {
+                @("Atualizar Todos os Sites do Grupo")
+            }
+            else
+            {
+                @("Atualizar Arquivos em Múltiplos Sites")
+            }
+        </MudText>
         
         <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex flex-column gap-4">
             <MudPaper Class="pa-4" Elevation="0">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Selecione os sites a serem atualizados:</MudText>
+                
+                @if (PreSelectedSiteNames != null && PreSelectedSiteNames.Any())
+                {
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">Sites do grupo que serão atualizados:</MudText>
+                    <MudAlert Severity="Severity.Info" Class="mb-3">
+                        Todos os @PreSelectedSiteNames.Count sites do grupo serão atualizados simultaneamente.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">Selecione os sites a serem atualizados:</MudText>
+                    
+                    if (sites.Count == 0)
+                    {
+                        <MudProgressCircular Indeterminate="true" />
+                    }
+                    else
+                    {
+                        <MudContainer MaxHeight="200px" Style="overflow-y: auto">
+                            @foreach (var site in sites)
+                            {
+                                <MudCheckBox T="bool" @bind-Checked="@site.IsSelected" Label="@site.Name" Color="Color.Primary" />
+                            }
+                        </MudContainer>
+                    }
+                }
+                
+                <MudDivider Class="my-4" />
+                
                 @if (!folderSelected)
                 {
-                    <MudText>Selecione a pasta local contendo os arquivos do site.</MudText>
+                    <MudText>Selecione a pasta local contendo os arquivos dos sites.</MudText>
                     
                     <div class="d-flex flex-column align-center justify-center mt-4">
                         <MudButton OnClick="SelectFolder" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Folder" 
-                                  Variant="Variant.Filled" Class="mb-2">
+                                  Variant="Variant.Filled" Class="mb-2" Disabled="@(!SelectedSites.Any())">
                             Selecionar pasta
                         </MudButton>
+                        
+                        @if (!SelectedSites.Any() && PreSelectedSiteNames == null)
+                        {
+                            <MudText Typo="Typo.caption" Class="mt-1">Selecione pelo menos um site para continuar</MudText>
+                        }
                     </div>
                 }
                 else
@@ -57,7 +102,7 @@
                     {
                         <MudAlert Severity="Severity.Info" Class="mt-4">Não há arquivos para atualizar.</MudAlert>
                         <MudButton OnClick="SelectFolder" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Folder" 
-                                   Variant="Variant.Outlined" Class="mt-4">
+                                  Variant="Variant.Outlined" Class="mt-4">
                             Selecionar outra pasta
                         </MudButton>
                     }
@@ -78,7 +123,7 @@
 
 @code {
     [CascadingParameter] IMudDialogInstance? MudDialog { get; set; } = null!;
-    [Parameter] public string SiteName { get; set; } = string.Empty;
+    [Parameter] public List<string>? PreSelectedSiteNames { get; set; }
     
     private bool folderSelected = false;
     private string selectedFolderName = string.Empty;
@@ -93,6 +138,30 @@
     private List<string> filesToUpdate = new();
     private Dictionary<string, string> folderMap = new(); // Mapeia Handle -> Path
     
+    private List<SiteSelectionItem> sites = new();
+    private List<string> SelectedSites => 
+        PreSelectedSiteNames != null && PreSelectedSiteNames.Any() 
+            ? PreSelectedSiteNames 
+            : sites.Where(s => s.IsSelected).Select(s => s.Name).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var allSites = await SiteService.GetSitesAsync();
+            sites = allSites.Select(s => new SiteSelectionItem { 
+                Name = s.Name, 
+                // Marcar como selecionado se estiver na lista de sites pré-selecionados
+                IsSelected = PreSelectedSiteNames != null && PreSelectedSiteNames.Contains(s.Name)
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            message = $"Erro ao carregar sites: {ex.Message}";
+            alertSeverity = Severity.Error;
+        }
+    }
+    
     // Método para fechar o diálogo
     private void Cancel()
     {
@@ -102,6 +171,8 @@
     // Método para selecionar pasta
     private async Task SelectFolder()
     {
+        if (!SelectedSites.Any()) return;
+        
         try
         {
             folderSelected = false;
@@ -131,8 +202,6 @@
             {
                 // Converter a data UTC para horário local se necessário
                 file.LastModified = file.LastModified.ToLocalTime();
-                Console.WriteLine($"file: {file.RelativePath} - {file.LastModified}");
-                Console.WriteLine(DateTime.Now.ToString());
             }
             await AnalyzeFiles();
         }
@@ -143,9 +212,11 @@
         }
     }
     
-    // Método para analisar arquivos
+    // Método para analisar arquivos (usamos o primeiro site selecionado como referência)
     private async Task AnalyzeFiles()
     {
+        if (!SelectedSites.Any()) return;
+        
         try
         {
             isAnalyzing = true;
@@ -153,15 +224,19 @@
             alertSeverity = Severity.Info;
             StateHasChanged();
             
+            // Usamos o primeiro site selecionado como referência para verificar quais arquivos precisam ser atualizados
+            // Isso é uma simplificação - em uma implementação mais sofisticada, poderíamos verificar cada site
+            string referenceSite = SelectedSites.First();
+            
             // Enviar lista de arquivos para o servidor para verificar quais precisam ser atualizados
-            filesToUpdate = await SiteService.CheckFilesForUpdateAsync(SiteName, clientFiles);
+            filesToUpdate = await SiteService.CheckFilesForUpdateAsync(referenceSite, clientFiles);
             
             isAnalyzing = false;
             analyzed = true;
             
             if (filesToUpdate.Count > 0)
             {
-                message = $"Encontrados {filesToUpdate.Count} arquivos para atualizar.";
+                message = $"Encontrados {filesToUpdate.Count} arquivos para atualizar em {SelectedSites.Count} site(s).";
                 alertSeverity = Severity.Info;
             }
             else
@@ -181,12 +256,12 @@
     // Método para fazer upload dos arquivos
     private async Task UploadFiles()
     {
-        if (filesToUpdate.Count == 0 || isUploading) return;
+        if (filesToUpdate.Count == 0 || isUploading || !SelectedSites.Any()) return;
         
         try
         {
             isUploading = true;
-            message = "Enviando arquivos...";
+            message = $"Enviando arquivos para {SelectedSites.Count} site(s)...";
             alertSeverity = Severity.Info;
             StateHasChanged();
             
@@ -196,7 +271,7 @@
             
             foreach (var filePath in filesToUpdate)
             {                 
-                if(filePath == ""){
+                if(string.IsNullOrEmpty(filePath)){
                     continue;
                 }
                 
@@ -219,8 +294,6 @@
                         Console.WriteLine($"Erro ao verificar tipo do item {filePath}: {ex.Message}");
                     }
                 }
-
-                Console.WriteLine($"filePath: {filePath}");
                 
                 // Obter o conteúdo do arquivo via JS
                 var fileContent = await JSRuntime.InvokeAsync<byte[]>("readFileFromFolder", filePath, folderMap);
@@ -234,15 +307,11 @@
                     filesLastModified.Add(filePath, clientFile.LastModified.ToUniversalTime());
                 }
             }
-
-            foreach (var file in filesLastModified)
-            {
-                Console.WriteLine($"file: {file.Key} - {file.Value}");
-            }
-            // Enviar os arquivos
-            await SiteService.UpdateSpecificFilesAsync(SiteName, filesToSend, filesLastModified);
             
-            message = "Arquivos atualizados com sucesso!";
+            // Enviar os arquivos para todos os sites selecionados
+            await SiteService.UpdateSpecificFilesInMultipleSitesAsync(SelectedSites, filesToSend, filesLastModified);
+            
+            message = $"Arquivos atualizados com sucesso em {SelectedSites.Count} site(s)!";
             alertSeverity = Severity.Success;
             
             // Fechar o diálogo após um atraso
@@ -278,5 +347,12 @@
         public string Handle { get; set; } = string.Empty;
         public string DirHandle { get; set; } = string.Empty;
         public string FileName { get; set; } = string.Empty;
+    }
+    
+    // Classe para os itens de seleção de sites
+    private class SiteSelectionItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public bool IsSelected { get; set; }
     }
 } 

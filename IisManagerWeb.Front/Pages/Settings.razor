@@ -1,4 +1,9 @@
 @page "/settings"
+@using IisManagerWeb.Shared.Models
+@using IisManagerWeb.Front.Services
+@inject SettingsService SettingsService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Configurações</PageTitle>
 
@@ -61,8 +66,67 @@
             </MudItem>
             
             <MudItem xs="12">
+                <MudDivider Class="my-4"/>
+                <MudText Typo="Typo.h5" GutterBottom="true">Arquivos para Ignorar</MudText>
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    Adicione padrões de arquivos que devem ser ignorados durante a comparação de arquivos entre o cliente e servidor, 
+                    similar ao .gitignore. Você pode usar padrões glob como "*.tmp", "logs/*", etc.
+                </MudText>
+                
+                <MudGrid>
+                    <MudItem xs="12" md="8">
+                        <MudTextField T="string" @bind-Value="newIgnorePattern" 
+                                      Label="Padrão de arquivo para ignorar" FullWidth="true" 
+                                      Class="mb-3" Placeholder="Ex: *.tmp, logs/*, .DS_Store"/>
+                    </MudItem>
+                    <MudItem xs="12" md="4" Class="d-flex align-center">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                                   OnClick="AddIgnorePattern" Class="mb-2">
+                            Adicionar Padrão
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+                
+                <MudPaper Class="pa-4 mb-4" Outlined="true" Style="max-height: 300px; overflow-y: auto">
+                    @if (!settings.IgnoredFiles.Any())
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-disabled">
+                            Nenhum padrão de arquivo ignorado configurado.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudList T="string" Dense="true">
+                            @foreach (var pattern in settings.IgnoredFiles)
+                            {
+                                <MudListItem T="string" Text="@pattern">
+                                    <div class="d-flex">
+                                        <MudText Class="flex-grow-1">@pattern</MudText>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                     Size="Size.Small" 
+                                                     OnClick="@(() => RemoveIgnorePattern(pattern))" 
+                                                     Color="Color.Error"/>
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                </MudPaper>
+            </MudItem>
+            
+            <MudItem xs="12">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" 
-                          OnClick="SaveSettings" Class="mr-2">Salvar</MudButton>
+                          OnClick="SaveSettings" Class="mr-2" Disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                        <MudText Class="ms-2">Salvando...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>Salvar</MudText>
+                    }
+                </MudButton>
                 <MudButton Variant="Variant.Outlined" Color="Color.Secondary" 
                           OnClick="ResetSettings">Redefinir</MudButton>
             </MudItem>
@@ -72,18 +136,43 @@
 
 @code {
     private MudForm form = null!;
-    private IisAppSettings settings = new IisAppSettings
+    private ManagerSettings settings = new();
+    private string newIgnorePattern = string.Empty;
+    private bool isSaving = false;
+    
+    protected override async Task OnInitializedAsync()
     {
-        OrganizationName = "Minha Empresa",
-        Theme = "light",
-        Language = "pt-BR",
-        EnableNotifications = true,
-        RefreshInterval = 30,
-        ConnectionLimit = 100,
-        ServerUrl = "https://localhost:5001",
-        EnableLogging = true,
-        EnableSSL = true
-    };
+        try
+        {
+            // Carrega as configurações do servidor
+            settings = await SettingsService.GetSettingsAsync();
+        }
+        catch (Exception ex)
+        {
+            // Em caso de erro, usa as configurações padrão
+            Console.WriteLine($"Erro ao carregar configurações: {ex.Message}");
+            settings = new ManagerSettings();
+        }
+    }
+    
+    private void AddIgnorePattern()
+    {
+        if (string.IsNullOrWhiteSpace(newIgnorePattern))
+            return;
+            
+        // Evitar duplicatas
+        if (!settings.IgnoredFiles.Contains(newIgnorePattern))
+        {
+            settings.IgnoredFiles.Add(newIgnorePattern);
+        }
+        
+        newIgnorePattern = string.Empty;
+    }
+    
+    private void RemoveIgnorePattern(string pattern)
+    {
+        settings.IgnoredFiles.Remove(pattern);
+    }
     
     private async Task SaveSettings()
     {
@@ -91,18 +180,28 @@
         
         if (form.IsValid)
         {
-            // Implementação real salvaria as configurações
-            await Task.Delay(1000); // Simula operação async
-            
-            // Notificação de sucesso
-            var options = new MudBlazor.DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
-            // var dialog = DialogService.Show<MudBlazor.DialogContentText>("Configurações salvas com sucesso!", options);
+            try
+            {
+                isSaving = true;
+                // Salva as configurações no servidor
+                await SettingsService.SaveSettingsAsync(settings);
+                
+                Snackbar.Add("Configurações salvas com sucesso!", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao salvar configurações: {ex.Message}", Severity.Error);
+            }
+            finally
+            {
+                isSaving = false;
+            }
         }
     }
     
     private void ResetSettings()
     {
-        settings = new IisAppSettings
+        settings = new ManagerSettings
         {
             OrganizationName = "Minha Empresa",
             Theme = "light",
@@ -112,23 +211,8 @@
             ConnectionLimit = 100,
             ServerUrl = "https://localhost:5001",
             EnableLogging = true,
-            EnableSSL = true
+            EnableSSL = true,
+            IgnoredFiles = new List<string>()
         };
-    }
-    
-    [Inject]
-    public required IDialogService DialogService { get; set; }
-    
-    public class IisAppSettings
-    {
-        public required string OrganizationName { get; set; }
-        public required string Theme { get; set; }
-        public required string Language { get; set; }
-        public bool EnableNotifications { get; set; }
-        public int RefreshInterval { get; set; }
-        public int ConnectionLimit { get; set; }
-        public required string ServerUrl { get; set; }
-        public bool EnableLogging { get; set; }
-        public bool EnableSSL { get; set; }
     }
 } 

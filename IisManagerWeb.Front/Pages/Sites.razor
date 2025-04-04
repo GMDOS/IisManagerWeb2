@@ -116,19 +116,43 @@
                         <MudList T="SiteGroupDto" Clickable="true" Style="width: 100%">
                             @foreach (var group in siteGroups)
                             {
-
-                                <MudListItem T="SiteGroupDto" Text="@group.Name" Icon="@Icons.Material.Filled.Folder"
-                                    OnClick="@(() => SelectGroup(group))"
-                                    Class="@(IsGroupSelected(group) ? "mud-selected-item mud-primary-text mud-primary-hover" : "")">
-                                    <MudText Typo="Typo.caption" Class="mt-1">
-                                        @group.SiteNames.Count sites
-                                    </MudText>
-
-                                </MudListItem>
-
+                                <MudMenu ActivationEvent="@MouseEvent.RightClick" PositionAtCursor="true" Dense="true"
+                                    class="mud-height-full mud-width-full">
+                                    <ActivatorContent>
+                                        <MudListItem T="SiteGroupDto" Text="@group.Name" Icon="@Icons.Material.Filled.Folder"
+                                            OnClick="@(() => SelectGroup(group))"
+                                            Class="@(IsGroupSelected(group) ? "mud-selected-item mud-primary-text mud-primary-hover" : "")">
+                                            <MudText Typo="Typo.body1">@group.Name</MudText>
+                                            <MudText Typo="Typo.caption" Class="mt-1">
+                                                @group.SiteNames.Count sites
+                                            </MudText>
+                                        </MudListItem>
+                                    </ActivatorContent>
+                                    <ChildContent>
+                                        <MudMenuItem OnClick="@(() => StartGroup(group))">
+                                            <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Class="mr-2" />
+                                            Iniciar Todos
+                                        </MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => StopGroup(group))">
+                                            <MudIcon Icon="@Icons.Material.Filled.Stop" Class="mr-2" />
+                                            Parar Todos
+                                        </MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => UpdateGroupFiles(group))">
+                                            <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Class="mr-2" />
+                                            Atualizar Arquivos
+                                        </MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => EditGroup(group))">
+                                            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
+                                            Editar
+                                        </MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => DeleteGroup(group))">
+                                            <MudIcon Icon="@Icons.Material.Filled.Delete" Class="mr-2" />
+                                            Excluir
+                                        </MudMenuItem>
+                                    </ChildContent>
+                                </MudMenu>
                             }
                         </MudList>
-
                     }
                 }
 
@@ -787,6 +811,96 @@
 
             // Abre o diálogo através do serviço, com await para garantir que o diálogo está pronto
             var dialog = await DialogService.ShowAsync<UpdateFolderDialog>("", parameters, options);
+
+            try
+            {
+                // Aguarda o resultado do diálogo
+                await dialog.Result;
+            }
+            catch (Exception)
+            {
+                // Ignora erros no resultado do diálogo
+            }
+            finally
+            {
+                // Atualiza os sites independente do resultado
+                await RefreshSites();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao processar diálogo: {ex.Message}", Severity.Error);
+            await RefreshSites();
+        }
+    }
+
+    private async Task OpenMultiSiteUpdateDialog()
+    {
+        try
+        {
+            // Limpar possíveis diálogos pendentes
+            await Task.Delay(100);
+
+            // Configurações do diálogo
+            var options = new DialogOptions
+            {
+                CloseOnEscapeKey = true,
+                FullWidth = true,
+                MaxWidth = MaxWidth.Medium,
+                NoHeader = true
+            };
+
+            // Abre o diálogo através do serviço
+            var dialog = await DialogService.ShowAsync<UpdateMultipleSitesDialog>("", options);
+
+            try
+            {
+                // Aguarda o resultado do diálogo
+                await dialog.Result;
+            }
+            catch (Exception)
+            {
+                // Ignora erros no resultado do diálogo
+            }
+            finally
+            {
+                // Atualiza os sites independente do resultado
+                await RefreshSites();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao processar diálogo: {ex.Message}", Severity.Error);
+            await RefreshSites();
+        }
+    }
+
+    private async Task UpdateGroupFiles(SiteGroupDto group)
+    {
+        if (group == null || group.SiteNames.Count == 0) return;
+        
+        try
+        {
+            // Limpar possíveis diálogos pendentes
+            await Task.Delay(100);
+
+            // Configurações do diálogo
+            var options = new DialogOptions
+            {
+                CloseOnEscapeKey = true,
+                FullWidth = true,
+                MaxWidth = MaxWidth.Medium,
+                NoHeader = true
+            };
+            
+            // Parâmetros para o diálogo
+            var parameters = new DialogParameters
+            {
+                ["PreSelectedSiteNames"] = group.SiteNames
+            };
+
+            // Abre o diálogo através do serviço
+            var dialog = await DialogService.ShowAsync<UpdateMultipleSitesDialog>("", parameters, options);
 
             try
             {

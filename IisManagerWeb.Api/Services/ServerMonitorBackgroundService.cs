@@ -49,12 +49,12 @@ public class ServerMonitorBackgroundService : BackgroundService
                     await _monitorService.BroadcastMetricsAsync(metrics, siteMetrics);
                     
                     // Aguardar pelo próximo intervalo com base nas configurações
-                    await Task.Delay(TimeSpan.FromSeconds(_monitorService.GetRefreshInterval()), stoppingToken);
+                    await Task.Delay(_monitorService.GetRefreshInterval(), stoppingToken);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Erro ao coletar ou enviar métricas do servidor");
-                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                    await Task.Delay(5000, stoppingToken); // 5000ms = 5 segundos
                 }
             }
         }
@@ -96,7 +96,7 @@ public class ServerMonitorBackgroundService : BackgroundService
                 {
                     // Atualiza o intervalo de atualização
                     _monitorService.UpdateRefreshInterval(settings.RefreshInterval);
-                    _logger.LogInformation("Configurações carregadas com sucesso. Intervalo de atualização: {RefreshInterval} segundos",
+                    _logger.LogInformation("Configurações carregadas com sucesso. Intervalo de atualização: {RefreshInterval} milissegundos",
                         settings.RefreshInterval);
                 }
             }

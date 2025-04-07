@@ -9,7 +9,6 @@ using IisManagerWeb.Api.Services;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
-// Adicionar suporte a CORS
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(
@@ -21,21 +20,28 @@ builder.Services.AddCors(options =>
         });
 });
 
-// Verificar privilégios de administrador
-if (!PrivilegeHelper.IsRunningAsAdministrator())
+if (!PrivilegeHelper.IsPrivilegedUser())
 {
     Console.WriteLine("A aplicação precisa ser executada como administrador.");
     Console.WriteLine("Solicitando elevação de privilégios...");
     
     try
     {
-        var startInfo = new ProcessStartInfo
+        var startInfo = new ProcessStartInfo();
+        if (OperatingSystem.IsWindows())
         {
-            UseShellExecute = true,
-            WorkingDirectory = Environment.CurrentDirectory,
-            FileName = Process.GetCurrentProcess().MainModule?.FileName,
-            Verb = "runas"
-        };
+            startInfo.UseShellExecute = true;
+            startInfo.WorkingDirectory = Environment.CurrentDirectory;
+            startInfo.FileName = Process.GetCurrentProcess().MainModule?.FileName;
+            startInfo.Verb = "runas";
+        }
+        if (OperatingSystem.IsLinux())
+        {
+            startInfo.UseShellExecute = true;
+            startInfo.WorkingDirectory = Environment.CurrentDirectory;
+            startInfo.FileName = "sudo";
+            startInfo.Arguments = Process.GetCurrentProcess().MainModule?.FileName;
+        }
 
         Process.Start(startInfo);
         Environment.Exit(0);
@@ -54,13 +60,11 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 });
 
-// Adicionar serviços de monitoramento
 builder.Services.AddSingleton<ServerMonitorService>();
 builder.Services.AddHostedService<ServerMonitorBackgroundService>();
 
 var app = builder.Build();
 
-// Habilitar CORS e WebSockets
 app.UseCors();
 app.UseWebSockets(new WebSocketOptions
 {
@@ -102,16 +106,33 @@ app.Run();
 [JsonSerializable(typeof(SiteMetrics))]
 [JsonSerializable(typeof(List<SiteMetrics>))]
 [JsonSerializable(typeof(MetricsWebSocketPacket))]
+[JsonSerializable(typeof(FileCheckResponse))]
+
 internal partial class AppJsonSerializerContext : JsonSerializerContext
 {
 }
 
 public static class PrivilegeHelper
 {
-    public static bool IsRunningAsAdministrator()
+    public static bool IsPrivilegedUser()
     {
-        using var identity = WindowsIdentity.GetCurrent();
-        var principal = new WindowsPrincipal(identity);
-        return principal.IsInRole(WindowsBuiltInRole.Administrator);
+        if (OperatingSystem.IsLinux())
+        {
+            try
+            {
+                return Environment.UserName == "root";
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        if (OperatingSystem.IsWindows())
+        {
+            using var identity = WindowsIdentity.GetCurrent();
+            var principal = new WindowsPrincipal(identity);
+            return principal.IsInRole(WindowsBuiltInRole.Administrator) || principal.IsInRole(WindowsBuiltInRole.PowerUser) || principal.IsInRole(WindowsBuiltInRole.SystemOperator);
+        }
+        return false;
     }
 }

@@ -41,7 +41,7 @@
             <MudItem xs="12" md="6">
                 <MudText Typo="Typo.h5" GutterBottom="true">Configurações do Servidor</MudText>
                 
-                <MudTextField T="int" Label="Intervalo de Atualização (segundos)" 
+                <MudTextField T="int" Label="Intervalo de Atualização (milissegundos)" 
                               @bind-Value="settings.RefreshInterval"
                               Minimum="5" Maximum="300" Class="mb-3"/>
                 

@@ -22,7 +22,7 @@ public class ServerMonitorService
     private readonly PerformanceCounter _requestsCounter;
     private readonly PerformanceCounter _connectionsCounter;
     private readonly Dictionary<string, PerformanceCounter> _siteRequestCounters = new();
-    private int _refreshInterval = 30; // Valor padrão, será substituído pela configuração
+    private int _refreshInterval = 1000; 
     
     [StructLayout(LayoutKind.Sequential)]
     public struct MemoryStatusEx
@@ -97,25 +97,16 @@ public class ServerMonitorService
         _clients.TryRemove(id, out _);
     }
     
-    /// <summary>
-    /// Atualiza o intervalo de atualização com base nas configurações
-    /// </summary>
-    public void UpdateRefreshInterval(int seconds)
+    public void UpdateRefreshInterval(int milliseconds)
     {
-        if (seconds >= 5)
+        if (milliseconds >= 100) // Definindo limite mínimo de 100ms
         {
-            _refreshInterval = seconds;
+            _refreshInterval = milliseconds;
         }
     }
     
-    /// <summary>
-    /// Obtém o intervalo de atualização atual
-    /// </summary>
     public int GetRefreshInterval() => _refreshInterval;
     
-    /// <summary>
-    /// Obtém métricas do servidor
-    /// </summary>
     public ServerMetrics GetCurrentMetrics()
     {
         double cpuUsage = 0;
@@ -198,9 +189,6 @@ public class ServerMonitorService
         };
     }
     
-    /// <summary>
-    /// Obtém métricas de sites específicos
-    /// </summary>
     public List<SiteMetrics> GetSiteMetrics()
     {
         var siteMetrics = new List<SiteMetrics>();

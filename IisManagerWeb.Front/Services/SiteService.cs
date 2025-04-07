@@ -3,7 +3,7 @@ using IisManagerWeb.Shared.Models;
 
 namespace IisManagerWeb.Front.Services;
 
-public class SiteService 
+public class SiteService
 {
     private readonly HttpClient _httpClient;
     private const string ApiUrl = "http://localhost:5135/sites";
@@ -17,7 +17,7 @@ public class SiteService
 
     public async Task<List<SiteDto>> GetSitesAsync()
     {
-        
+
         return await _httpClient.GetFromJsonAsync<List<SiteDto>>("sites") ?? new List<SiteDto>();
     }
 
@@ -48,47 +48,33 @@ public class SiteService
     {
         var content = new ByteArrayContent(zipContent);
         content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
-        
+
         var response = await _httpClient.PostAsync($"sites/{name}/update-files", content);
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// Verifica quais arquivos precisam ser atualizados no servidor
-    /// </summary>
-    /// <param name="name">Nome do site</param>
-    /// <param name="files">Lista de arquivos do cliente</param>
-    /// <returns>Lista de caminhos relativos de arquivos que precisam ser atualizados</returns>
-    public async Task<List<string>> CheckFilesForUpdateAsync(string name, List<ClientFileInfo> files)
+    public async Task<FileCheckResponse> CheckFilesForUpdateAsync(string name, List<ClientFileInfo> files)
     {
         var response = await _httpClient.PostAsJsonAsync($"sites/{name}/check-files", files);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+        return await response.Content.ReadFromJsonAsync<FileCheckResponse>() ?? new FileCheckResponse();
     }
-    
-    /// <summary>
-    /// Atualiza apenas os arquivos específicos no servidor
-    /// </summary>
-    /// <param name="name">Nome do site</param>
-    /// <param name="files">Dicionário com o caminho relativo do arquivo e o conteúdo</param>
-    /// <param name="filesLastModified">Dicionário opcional com as datas de modificação dos arquivos</param>
+
     public async Task UpdateSpecificFilesAsync(string name, Dictionary<string, Stream> files, Dictionary<string, DateTime>? filesLastModified = null)
     {
         using var content = new MultipartFormDataContent();
-        
+
         foreach (var file in files)
         {
             var streamContent = new StreamContent(file.Value);
             content.Add(streamContent, "files", file.Key);
-            
-            // Se tiver a data de modificação do arquivo, adiciona ao formulário
+
             if (filesLastModified != null && filesLastModified.TryGetValue(file.Key, out var lastModified))
             {
-                // Adiciona a data de modificação como um campo adicional no formulário
                 content.Add(new StringContent(lastModified.ToString("o")), $"lastModified_{file.Key}");
             }
         }
-        
+
         var response = await _httpClient.PostAsync($"sites/{name}/update-specific-files", content);
         response.EnsureSuccessStatusCode();
     }
@@ -135,37 +121,27 @@ public class SiteService
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// Atualiza arquivos específicos em um grupo de sites
-    /// </summary>
-    /// <param name="siteNames">Lista de nomes dos sites a serem atualizados</param>
-    /// <param name="files">Dicionário com o caminho relativo do arquivo e o conteúdo</param>
-    /// <param name="filesLastModified">Dicionário opcional com as datas de modificação dos arquivos</param>
     public async Task UpdateSpecificFilesInMultipleSitesAsync(List<string> siteNames, Dictionary<string, Stream> files, Dictionary<string, DateTime>? filesLastModified = null)
     {
         using var content = new MultipartFormDataContent();
-        
-        // Adiciona os nomes dos sites ao formulário
+
         for (int i = 0; i < siteNames.Count; i++)
         {
             content.Add(new StringContent(siteNames[i]), $"siteNames[{i}]");
         }
-        
-        // Adiciona os arquivos ao formulário
+
         foreach (var file in files)
         {
             var streamContent = new StreamContent(file.Value);
             content.Add(streamContent, "files", file.Key);
-            
-            // Se tiver a data de modificação do arquivo, adiciona ao formulário
+
             if (filesLastModified != null && filesLastModified.TryGetValue(file.Key, out var lastModified))
             {
-                // Adiciona a data de modificação como um campo adicional no formulário
                 content.Add(new StringContent(lastModified.ToString("o")), $"lastModified_{file.Key}");
             }
         }
-        
+
         var response = await _httpClient.PostAsync($"sites/update-multiple", content);
         response.EnsureSuccessStatusCode();
     }
-} 
+}

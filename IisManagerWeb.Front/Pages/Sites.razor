@@ -77,7 +77,7 @@
                                                     Reiniciar
                                                 </MudMenuItem>
 
-                                                <MudMenuItem OnClick="@OpenDialogViaService">
+                                                <MudMenuItem OnClick="@OpenDialog">
                                                     <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2" />
                                                     Atualizar Arquivos
                                                 </MudMenuItem>
@@ -166,95 +166,97 @@
                 @if (selectedSites.Count == 1)
                 {
                     var selectedSite = selectedSites[0];
-                    <!-- Informações do Site -->
-                    <MudItem xs="12" md="6">
-                        <MudCard>
-                            <MudCardHeader>
-                                <CardHeaderContent>
-                                    <MudText Typo="Typo.h6">Informações do Site</MudText>
-                                </CardHeaderContent>
-                            </MudCardHeader>
-                            <MudCardContent>
-                                <MudList T="string" ReadOnly="true" Dense="true">
-                                    <MudListItem Icon="@Icons.Material.Filled.Info">
-                                        <MudText><b>ID:</b> @selectedSite.Id</MudText>
-                                    </MudListItem>
-                                    <MudListItem Icon="@Icons.Material.Filled.Settings">
-                                        <MudText><b>Inicialização Automática:</b> @selectedSite.ServerAutoStart
-                                        </MudText>
-                                    </MudListItem>
-                                    <MudListItem Icon="@Icons.Material.Filled.Api">
-                                        <MudText><b>Estado:</b> @selectedSite.State</MudText>
-                                    </MudListItem>
-                                </MudList>
-                            </MudCardContent>
-                        </MudCard>
-                    </MudItem>
+                    <MudGrid>
+                        <!-- Informações do Site -->
+                        <MudItem xs="12" md="6">
+                            <MudCard>
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">Informações do Site</MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <MudList T="string" ReadOnly="true" Dense="true">
+                                        <MudListItem Icon="@Icons.Material.Filled.Info">
+                                            <MudText><b>ID:</b> @selectedSite.Id</MudText>
+                                        </MudListItem>
+                                        <MudListItem Icon="@Icons.Material.Filled.Settings">
+                                            <MudText><b>Inicialização Automática:</b> @selectedSite.ServerAutoStart
+                                            </MudText>
+                                        </MudListItem>
+                                        <MudListItem Icon="@Icons.Material.Filled.Api">
+                                            <MudText><b>Estado:</b> @selectedSite.State</MudText>
+                                        </MudListItem>
+                                    </MudList>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
 
-                    <!-- Aplicações do Site -->
-                    <MudItem xs="12" md="6">
-                        <MudCard>
-                            <MudCardHeader>
-                                <CardHeaderContent>
-                                    <MudText Typo="Typo.h6">Aplicações</MudText>
-                                </CardHeaderContent>
-                            </MudCardHeader>
-                            <MudCardContent>
-                                @if (selectedSite.Applications.Any())
-                                {
-                                    <MudTable Items="@selectedSite.Applications" Hover="true" Striped="true">
-                                        <HeaderContent>
-                                            <MudTh>Caminho</MudTh>
-                                            <MudTh>Pool de Aplicação</MudTh>
-                                        </HeaderContent>
-                                        <RowTemplate>
-                                            <MudTd DataLabel="Caminho">@context.Path</MudTd>
-                                            <MudTd DataLabel="Pool de Aplicação">@context.ApplicationPoolName</MudTd>
-                                        </RowTemplate>
-                                    </MudTable>
-                                }
-                                else
-                                {
-                                    <MudAlert Severity="Severity.Info">Nenhuma aplicação encontrada.</MudAlert>
-                                }
-                            </MudCardContent>
-                        </MudCard>
-                    </MudItem>
+                        <!-- Aplicações do Site -->
+                        <MudItem xs="12" md="6">
+                            <MudCard>
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">Aplicações</MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    @if (selectedSite.Applications.Any())
+                                    {
+                                        <MudTable Items="@selectedSite.Applications" Hover="true" Striped="true">
+                                            <HeaderContent>
+                                                <MudTh>Caminho</MudTh>
+                                                <MudTh>Pool de Aplicação</MudTh>
+                                            </HeaderContent>
+                                            <RowTemplate>
+                                                <MudTd DataLabel="Caminho">@context.Path</MudTd>
+                                                <MudTd DataLabel="Pool de Aplicação">@context.ApplicationPoolName</MudTd>
+                                            </RowTemplate>
+                                        </MudTable>
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Info">Nenhuma aplicação encontrada.</MudAlert>
+                                    }
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
 
-                    <!-- Bindings do Site -->
-                    <MudItem xs="12">
-                        <MudCard>
-                            <MudCardHeader>
-                                <CardHeaderContent>
-                                    <MudText Typo="Typo.h6">Bindings</MudText>
-                                </CardHeaderContent>
-                            </MudCardHeader>
-                            <MudCardContent>
-                                @if (selectedSite.Bindings.Any())
-                                {
-                                    <MudTable Items="@selectedSite.Bindings" Hover="true" Striped="true">
-                                        <HeaderContent>
-                                            <MudTh>Protocolo</MudTh>
-                                            <MudTh>Host</MudTh>
-                                            <MudTh>Binding</MudTh>
-                                            <MudTh>Endpoint</MudTh>
-                                        </HeaderContent>
-                                        <RowTemplate>
-                                            <MudTd DataLabel="Protocolo">@context.Protocol</MudTd>
-                                            <MudTd DataLabel="Host">@(string.IsNullOrEmpty(context.Host) ? "*" : context.Host)
-                                            </MudTd>
-                                            <MudTd DataLabel="Binding">@context.BindingInformation</MudTd>
-                                            <MudTd DataLabel="Endpoint">@context.EndPoint</MudTd>
-                                        </RowTemplate>
-                                    </MudTable>
-                                }
-                                else
-                                {
-                                    <MudAlert Severity="Severity.Info">Nenhum binding encontrado.</MudAlert>
-                                }
-                            </MudCardContent>
-                        </MudCard>
-                    </MudItem>
+                        <!-- Bindings do Site -->
+                        <MudItem xs="12">
+                            <MudCard>
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">Bindings</MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    @if (selectedSite.Bindings.Any())
+                                    {
+                                        <MudTable Items="@selectedSite.Bindings" Hover="true" Striped="true">
+                                            <HeaderContent>
+                                                <MudTh>Protocolo</MudTh>
+                                                <MudTh>Host</MudTh>
+                                                <MudTh>Binding</MudTh>
+                                                <MudTh>Endpoint</MudTh>
+                                            </HeaderContent>
+                                            <RowTemplate>
+                                                <MudTd DataLabel="Protocolo">@context.Protocol</MudTd>
+                                                <MudTd DataLabel="Host">@(string.IsNullOrEmpty(context.Host) ? "*" : context.Host)
+                                                </MudTd>
+                                                <MudTd DataLabel="Binding">@context.BindingInformation</MudTd>
+                                                <MudTd DataLabel="Endpoint">@context.EndPoint</MudTd>
+                                            </RowTemplate>
+                                        </MudTable>
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Info">Nenhum binding encontrado.</MudAlert>
+                                    }
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
                 }
                 else if (selectedSites.Count > 1)
                 {
@@ -730,7 +732,7 @@
         }
     }
 
-    private async Task OpenDialogViaService()
+    private async Task OpenDialog()
     {
         if (selectedSites.Count != 1) return;
 
@@ -748,7 +750,6 @@
                 ["SiteName"] = selectedSites[0].Name
             };
 
-            // Configurações do diálogo - configurações mínimas para reduzir problemas
             var options = new DialogOptions
             {
                 CloseOnEscapeKey = true,
@@ -804,8 +805,8 @@
             var options = new DialogOptions
             {
                 CloseOnEscapeKey = true,
-                FullWidth = false,
-                MaxWidth = MaxWidth.ExtraSmall,
+                FullWidth = true,
+                MaxWidth = MaxWidth.ExtraExtraLarge,
                 NoHeader = true
             };
 

@@ -101,9 +101,6 @@
                 message = "Arquivo enviado com sucesso!";
                 alertSeverity = Severity.Success;
                 
-                // Aguarda um pequeno delay antes de fechar
-                await Task.Delay(1000);
-                MudDialog?.Close(true);
             }
             else
             {

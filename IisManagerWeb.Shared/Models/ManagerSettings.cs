@@ -17,7 +17,7 @@ public class ManagerSettings
     public bool EnableNotifications { get; set; } = true;
     
     [JsonPropertyName("refreshInterval")]
-    public int RefreshInterval { get; set; } = 30;
+    public int RefreshInterval { get; set; } = 1000;
     
     [JsonPropertyName("connectionLimit")]
     public int ConnectionLimit { get; set; } = 100;

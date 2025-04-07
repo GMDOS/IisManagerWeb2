@@ -52,33 +52,20 @@
             </MudPaper>
         </MudItem>
         
-        <!-- Gráficos -->
-        <MudItem xs="12" md="6">
+        <!-- Gráfico combinado de CPU e Memória -->
+        <MudItem xs="12">
             <MudPaper Elevation="2" Class="pa-4 chart-container">
-                <MudText Typo="Typo.h6" Class="mb-4">Utilização de CPU (Última Hora)</MudText>
+                <MudText Typo="Typo.h6" Class="mb-4">Utilização de CPU e Memória (Última Hora)</MudText>
                 @if (_metricsHistory?.Metrics != null && _metricsHistory.Metrics.Any())
                 {
-                    <div style="height: 300px;">
-                        <MudChart ChartType="ChartType.Line" ChartSeries="@_cpuSeries" XAxisLabels="@_timeLabels" 
-                                 Width="100%" Height="300px"></MudChart>
-                    </div>
-                }
-                else
-                {
-                    <MudProgressCircular Indeterminate="true" />
-                    <MudText Typo="Typo.caption">Carregando dados do histórico...</MudText>
-                }
-            </MudPaper>
-        </MudItem>
-        
-        <MudItem xs="12" md="6">
-            <MudPaper Elevation="2" Class="pa-4 chart-container">
-                <MudText Typo="Typo.h6" Class="mb-4">Utilização de Memória (Última Hora)</MudText>
-                @if (_metricsHistory?.Metrics != null && _metricsHistory.Metrics.Any())
-                {
-                    <div style="height: 300px;">
-                        <MudChart ChartType="ChartType.Line" ChartSeries="@_memorySeries" XAxisLabels="@_timeLabels" 
-                                 Width="100%" Height="300px"></MudChart>
+                    <div style="height: 350px;">
+                        <MudTimeSeriesChart ChartSeries="@_timeSeriesList"
+                                           Width="100%"
+                                           Height="350px"
+                                           ChartOptions="@_chartOptions"
+                                           CanHideSeries="true"
+                                           TimeLabelSpacing="TimeSpan.FromMinutes(10)"
+                                           DataMarkerTooltipTimeLabelFormat="dd/MM HH:mm:ss" />
                     </div>
                 }
                 else
@@ -121,7 +108,7 @@
         
         <MudItem xs="12" Class="d-flex justify-center mt-2">
             <MudText Typo="Typo.caption">
-                Atualização a cada @_refreshInterval segundos | Última atualização: @(_currentMetrics?.Timestamp.ToLocalTime().ToString("HH:mm:ss") ?? "Nunca")
+                Atualização a cada @(_refreshInterval < 1000 ? $"{_refreshInterval} milissegundos" : $"{_refreshInterval / 1000.0:F1} segundos") | Última atualização: @(_currentMetrics?.Timestamp.ToLocalTime().ToString("HH:mm:ss.fff") ?? "Nunca")
             </MudText>
         </MudItem>
     </MudGrid>
@@ -138,11 +125,20 @@
     private ServerMetrics? _currentMetrics;
     private List<SiteMetrics>? _siteMetrics;
     private ServerMetricsHistory? _metricsHistory;
-    private List<ChartSeries> _cpuSeries = new();
-    private List<ChartSeries> _memorySeries = new();
-    private string[] _timeLabels = Array.Empty<string>();
+    private List<TimeSeriesChartSeries> _timeSeriesList = new();
     private int _refreshInterval = 30;
     private bool _isConnected;
+    private int _selectedIndex = -1;
+
+    // Configurações do gráfico
+    private ChartOptions _chartOptions = new ChartOptions()
+    {
+        LineStrokeWidth = 2,
+        YAxisTicks = 10,
+        YAxisLines = false,
+        XAxisLines = false,
+        YAxisRequireZeroPoint = true
+    };
     
     protected override async Task OnInitializedAsync()
     {
@@ -156,9 +152,10 @@
             // Carregar histórico de métricas
             _metricsHistory = await MetricsService.GetMetricsHistoryAsync();
             UpdateChartData();
-            
+
             // Conectar ao WebSocket para receber atualizações em tempo real
             await ConnectToWebSocketAsync();
+
         }
         catch (Exception ex)
         {
@@ -166,9 +163,6 @@
         }
     }
     
-    /// <summary>
-    /// Atualiza os dados do gráfico com base no histórico
-    /// </summary>
     private void UpdateChartData()
     {
         if (_metricsHistory?.Metrics == null || !_metricsHistory.Metrics.Any())
@@ -177,33 +171,38 @@
         // Ordenar métricas por timestamp
         var metrics = _metricsHistory.Metrics.OrderBy(m => m.Timestamp).ToList();
         
-        // Criar labels de tempo (hora:minuto)
-        _timeLabels = metrics.Select(m => m.Timestamp.ToLocalTime().ToString("HH:mm")).ToArray();
+        // Limpar séries existentes
+        _timeSeriesList.Clear();
         
-        // Criar série para CPU
-        _cpuSeries = new List<ChartSeries>
+        // Criar séries de dados para CPU e Memória
+        var cpuSeries = new TimeSeriesChartSeries
         {
-            new ChartSeries
-            {
-                Name = "CPU (%)",
-                Data = metrics.Select(m => (double)m.CpuUsage).ToArray()
-            }
+            Index = 0,
+            Name = "CPU (%)",
+            Data = metrics.Select(m => new TimeSeriesChartSeries.TimeValue(m.Timestamp.ToLocalTime(), m.CpuUsage)).ToList(),
+            IsVisible = true,
+            LineDisplayType = LineDisplayType.Line,
+            DataMarkerTooltipTitleFormat = "{{X_VALUE}}",
+            DataMarkerTooltipSubtitleFormat = "CPU: {{Y_VALUE}}%",
         };
         
-        // Criar série para Memória
-        _memorySeries = new List<ChartSeries>
+        var memorySeries = new TimeSeriesChartSeries
         {
-            new ChartSeries
-            {
-                Name = "Memória (%)",
-                Data = metrics.Select(m => (double)m.MemoryUsage).ToArray()
-            }
+            Index = 1,
+            Name = "Memória (%)",
+            Data = metrics.Select(m => new TimeSeriesChartSeries.TimeValue(m.Timestamp.ToLocalTime(), m.MemoryUsage)).ToList(),
+            IsVisible = true,
+            LineDisplayType = LineDisplayType.Line,
+            DataMarkerTooltipTitleFormat = "{{X_VALUE}}",
+            DataMarkerTooltipSubtitleFormat = "Memória: {{Y_VALUE}}%"
         };
+        
+        _timeSeriesList.Add(cpuSeries);
+        _timeSeriesList.Add(memorySeries);
+        
+        StateHasChanged();
     }
     
-    /// <summary>
-    /// Conecta ao WebSocket para receber atualizações em tempo real
-    /// </summary>
     private async Task ConnectToWebSocketAsync()
     {
         if (_isConnected)
@@ -220,14 +219,10 @@
         }
     }
     
-    /// <summary>
-    /// Manipula atualizações de métricas do servidor
-    /// </summary>
     private void HandleMetricsUpdate(ServerMetrics metrics)
     {
         _currentMetrics = metrics;
         
-        // Adicionar ao histórico local para atualizar os gráficos
         if (_metricsHistory != null)
         {
             _metricsHistory.Metrics.Add(metrics);
@@ -245,27 +240,18 @@
         StateHasChanged();
     }
     
-    /// <summary>
-    /// Manipula atualizações de métricas de sites
-    /// </summary>
     private void HandleSiteMetricsUpdate(List<SiteMetrics> siteMetrics)
     {
         _siteMetrics = siteMetrics;
         StateHasChanged();
     }
     
-    /// <summary>
-    /// Manipula atualizações do intervalo de atualização
-    /// </summary>
     private void HandleRefreshIntervalUpdate(int refreshInterval)
     {
         _refreshInterval = refreshInterval;
         StateHasChanged();
     }
     
-    /// <summary>
-    /// Determina a cor do indicador de CPU com base na utilização
-    /// </summary>
     private Color GetCpuColor(double cpuUsage)
     {
         return cpuUsage switch
@@ -277,9 +263,6 @@
         };
     }
     
-    /// <summary>
-    /// Determina a cor do indicador de memória com base na utilização
-    /// </summary>
     private Color GetMemoryColor(double memoryUsage)
     {
         return memoryUsage switch
@@ -291,9 +274,6 @@
         };
     }
     
-    /// <summary>
-    /// Desconecta o WebSocket quando a página é descartada
-    /// </summary>
     public async ValueTask DisposeAsync()
     {
         if (_isConnected)

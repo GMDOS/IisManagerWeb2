@@ -82,27 +82,96 @@
                             <MudText Class="mt-2">Analisando arquivos...</MudText>
                         </div>
                     }
-                    else if (filesToUpdate.Count > 0)
+                    else if (fileCheckResponse != null && fileCheckResponse.FilesToUpdate.Count > 0)
                     {
-                        <MudText Typo="Typo.body2" Class="mt-2">Arquivos para atualizar: @filesToUpdate.Count</MudText>
-                        <MudButton OnClick="UploadFiles" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" 
-                                  Variant="Variant.Filled" Class="mt-4" Disabled="@isUploading">
-                            @if (isUploading)
-                            {
-                                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                                <MudText Class="ms-2">Enviando...</MudText>
-                            }
-                            else
-                            {
-                                @("Enviar arquivos modificados")
-                            }
-                        </MudButton>
+                        <MudGrid Class="mt-4">
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Info" Class="mb-4">
+                                    Foram encontrados @fileCheckResponse.FilesToUpdate.Count arquivos para atualizar em @SelectedSites.Count site(s).
+                                </MudAlert>
+                                
+                                <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2">
+                                    <MudTabPanel Text="Arquivos para Atualizar">
+                                        <MudPaper Class="pa-4" Outlined="true" Elevation="0">
+                                            <MudDataGrid T="FileUpdateInfo" 
+                                                         Items="@fileCheckResponse.Files.Where(f => !f.IsIgnored).ToList()" 
+                                                         Filterable="true" 
+                                                         FilterMode="DataGridFilterMode.Simple"
+                                                         Dense="true" 
+                                                         Bordered="true" 
+                                                         Striped="true"
+                                                         Hover="true"
+                                                         Height="400px">
+                                                <Columns>
+                                                    <PropertyColumn Property="x => x.RelativePath" Title="Caminho do Arquivo" />
+                                                    <TemplateColumn Title="Data Modificação (Cliente)">
+                                                        <CellTemplate>
+                                                            @(context.Item.ClientFile?.LastModified.ToString("dd/MM/yyyy HH:mm:ss") ?? "-")
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                    <TemplateColumn Title="Data Modificação (Servidor)">
+                                                        <CellTemplate>
+                                                            @(context.Item.ServerFile?.LastModified.ToString("dd/MM/yyyy HH:mm:ss") ?? "Não existe")
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                    <TemplateColumn Title="Motivo da Atualização">
+                                                        <CellTemplate>
+                                                            @GetUpdateReasonText(context.Item.UpdateReason)
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                </Columns>
+                                            </MudDataGrid>
+                                        </MudPaper>
+                                    </MudTabPanel>
+                                    <MudTabPanel Text="Arquivos Ignorados">
+                                        <MudPaper Class="pa-4" Outlined="true" Elevation="0">
+                                            @if(fileCheckResponse.IgnoredFiles.Count > 0)
+                                            {
+                                                <MudDataGrid T="FileUpdateInfo" 
+                                                             Items="@fileCheckResponse.IgnoredFiles" 
+                                                             Filterable="true" 
+                                                             FilterMode="DataGridFilterMode.Simple"
+                                                             Dense="true" 
+                                                             Bordered="true" 
+                                                             Striped="true"
+                                                             Hover="true"
+                                                             Height="400px">
+                                                    <Columns>
+                                                        <PropertyColumn Property="x => x.RelativePath" Title="Caminho do Arquivo" />
+                                                        <PropertyColumn Property="x => x.IgnoreReason" Title="Motivo" />
+                                                    </Columns>
+                                                </MudDataGrid>
+                                            }
+                                            else
+                                            {
+                                                <MudAlert Severity="Severity.Info">Não há arquivos ignorados.</MudAlert>
+                                            }
+                                        </MudPaper>
+                                    </MudTabPanel>
+                                </MudTabs>
+                                
+                                <div class="d-flex justify-center mt-4">
+                                    <MudButton OnClick="UploadFiles" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" 
+                                               Variant="Variant.Filled" Disabled="@isUploading">
+                                        @if (isUploading)
+                                        {
+                                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                            <MudText Class="ms-2">Enviando...</MudText>
+                                        }
+                                        else
+                                        {
+                                            @("Enviar arquivos modificados")
+                                        }
+                                    </MudButton>
+                                </div>
+                            </MudItem>
+                        </MudGrid>
                     }
                     else if (analyzed)
                     {
                         <MudAlert Severity="Severity.Info" Class="mt-4">Não há arquivos para atualizar.</MudAlert>
                         <MudButton OnClick="SelectFolder" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Folder" 
-                                  Variant="Variant.Outlined" Class="mt-4">
+                                   Variant="Variant.Outlined" Class="mt-4">
                             Selecionar outra pasta
                         </MudButton>
                     }
@@ -134,15 +203,17 @@
     private string message = string.Empty;
     private Severity alertSeverity = Severity.Info;
     
+    private List<SiteDto> AvailableSites { get; set; } = new();
+    
     private List<ClientFileInfo> clientFiles = new();
-    private List<string> filesToUpdate = new();
-    private Dictionary<string, string> folderMap = new(); // Mapeia Handle -> Path
+    private FileCheckResponse? fileCheckResponse;
+    private Dictionary<string, string> folderMap = new();
     
     private List<SiteSelectionItem> sites = new();
-    private List<string> SelectedSites => 
+    private HashSet<string> SelectedSites => 
         PreSelectedSiteNames != null && PreSelectedSiteNames.Any() 
-            ? PreSelectedSiteNames 
-            : sites.Where(s => s.IsSelected).Select(s => s.Name).ToList();
+            ? PreSelectedSiteNames.ToHashSet() 
+            : sites.Where(s => s.IsSelected).Select(s => s.Name).ToHashSet();
 
     protected override async Task OnInitializedAsync()
     {
@@ -151,7 +222,6 @@
             var allSites = await SiteService.GetSitesAsync();
             sites = allSites.Select(s => new SiteSelectionItem { 
                 Name = s.Name, 
-                // Marcar como selecionado se estiver na lista de sites pré-selecionados
                 IsSelected = PreSelectedSiteNames != null && PreSelectedSiteNames.Contains(s.Name)
             }).ToList();
         }
@@ -162,13 +232,11 @@
         }
     }
     
-    // Método para fechar o diálogo
     private void Cancel()
     {
         MudDialog?.Cancel();
     }
     
-    // Método para selecionar pasta
     private async Task SelectFolder()
     {
         if (!SelectedSites.Any()) return;
@@ -177,11 +245,10 @@
         {
             folderSelected = false;
             clientFiles.Clear();
-            filesToUpdate.Clear();
+            fileCheckResponse = null;
             message = string.Empty;
             analyzed = false;
             
-            // Chama a API js para selecionar pasta
             var result = await JSRuntime.InvokeAsync<FolderSelectionResult>("selectFolder");
             
             if (!result.Success)
@@ -196,11 +263,9 @@
             folderMap = result.FolderMap;
             fileCount = result.FileCount;
             
-            // Ajustar o fuso horário das datas recebidas do JavaScript
             clientFiles = result.Files;
             foreach (var file in clientFiles)
             {
-                // Converter a data UTC para horário local se necessário
                 file.LastModified = file.LastModified.ToLocalTime();
             }
             await AnalyzeFiles();
@@ -212,7 +277,6 @@
         }
     }
     
-    // Método para analisar arquivos (usamos o primeiro site selecionado como referência)
     private async Task AnalyzeFiles()
     {
         if (!SelectedSites.Any()) return;
@@ -220,30 +284,14 @@
         try
         {
             isAnalyzing = true;
-            message = "Analisando arquivos...";
-            alertSeverity = Severity.Info;
             StateHasChanged();
             
-            // Usamos o primeiro site selecionado como referência para verificar quais arquivos precisam ser atualizados
-            // Isso é uma simplificação - em uma implementação mais sofisticada, poderíamos verificar cada site
             string referenceSite = SelectedSites.First();
             
-            // Enviar lista de arquivos para o servidor para verificar quais precisam ser atualizados
-            filesToUpdate = await SiteService.CheckFilesForUpdateAsync(referenceSite, clientFiles);
+            fileCheckResponse = await SiteService.CheckFilesForUpdateAsync(referenceSite, clientFiles);
             
             isAnalyzing = false;
             analyzed = true;
-            
-            if (filesToUpdate.Count > 0)
-            {
-                message = $"Encontrados {filesToUpdate.Count} arquivos para atualizar em {SelectedSites.Count} site(s).";
-                alertSeverity = Severity.Info;
-            }
-            else
-            {
-                message = "Não há arquivos para atualizar.";
-                alertSeverity = Severity.Success;
-            }
         }
         catch (Exception ex)
         {
@@ -253,10 +301,9 @@
         }
     }
     
-    // Método para fazer upload dos arquivos
     private async Task UploadFiles()
     {
-        if (filesToUpdate.Count == 0 || isUploading || !SelectedSites.Any()) return;
+        if (fileCheckResponse == null || fileCheckResponse.FilesToUpdate.Count == 0 || isUploading || !SelectedSites.Any()) return;
         
         try
         {
@@ -265,24 +312,21 @@
             alertSeverity = Severity.Info;
             StateHasChanged();
             
-            // Preparar os arquivos para envio
             var filesToSend = new Dictionary<string, Stream>();
             var filesLastModified = new Dictionary<string, DateTime>();
             
-            foreach (var filePath in filesToUpdate)
+            foreach (var filePath in fileCheckResponse.FilesToUpdate)
             {                 
                 if(string.IsNullOrEmpty(filePath)){
                     continue;
                 }
                 
-                // Verificar se é um diretório através do mapa de pastas
                 if (folderMap.TryGetValue(filePath, out var infoJson))
                 {
                     try 
                     {
                         var info = System.Text.Json.JsonSerializer.Deserialize<FolderItemInfo>(infoJson);
                         
-                        // Pular diretórios, não precisamos enviar diretórios, apenas arquivos
                         if (info?.Type == "directory")
                         {
                             Console.WriteLine($"Ignorando diretório: {filePath}");
@@ -295,28 +339,48 @@
                     }
                 }
                 
-                // Obter o conteúdo do arquivo via JS
                 var fileContent = await JSRuntime.InvokeAsync<byte[]>("readFileFromFolder", filePath, folderMap);
                 filesToSend.Add(filePath, new MemoryStream(fileContent));
                 
-                // Obter a data de modificação do arquivo
                 var clientFile = clientFiles.FirstOrDefault(f => f.RelativePath == filePath);
                 if (clientFile != null)
                 {
-                    // Garantir que a data está no formato UTC para envio ao servidor
                     filesLastModified.Add(filePath, clientFile.LastModified.ToUniversalTime());
                 }
             }
             
-            // Enviar os arquivos para todos os sites selecionados
-            await SiteService.UpdateSpecificFilesInMultipleSitesAsync(SelectedSites, filesToSend, filesLastModified);
+            var sitesAtualizados = 0;
             
-            message = $"Arquivos atualizados com sucesso em {SelectedSites.Count} site(s)!";
-            alertSeverity = Severity.Success;
+            foreach (var siteName in SelectedSites)
+            {
+                try
+                {
+                    foreach (var file in filesToSend)
+                    {
+                        file.Value.Position = 0;
+                    }
+                    
+                    await SiteService.UpdateSpecificFilesAsync(siteName, filesToSend, filesLastModified);
+                    sitesAtualizados++;
+                }
+                catch (Exception ex)
+                {
+                    message = $"Erro ao atualizar o site {siteName}: {ex.Message}";
+                    alertSeverity = Severity.Error;
+                    break;
+                }
+            }
             
-            // Fechar o diálogo após um atraso
-            await Task.Delay(1500);
-            MudDialog?.Close(true);
+            if (sitesAtualizados == SelectedSites.Count)
+            {
+                message = $"Todos os {sitesAtualizados} sites foram atualizados com sucesso.";
+                alertSeverity = Severity.Success;
+            }
+            else
+            {
+                message = $"{sitesAtualizados} de {SelectedSites.Count} sites foram atualizados.";
+                alertSeverity = Severity.Warning;
+            }
         }
         catch (Exception ex)
         {
@@ -330,7 +394,6 @@
         }
     }
     
-    // Classe para receber o resultado da seleção de pasta
     private class FolderSelectionResult
     {
         public bool Success { get; set; }
@@ -340,7 +403,6 @@
         public Dictionary<string, string> FolderMap { get; set; } = new();
     }
 
-    // Classe para deserializar informações do tipo de item
     private class FolderItemInfo
     {
         public string Type { get; set; } = string.Empty;
@@ -349,10 +411,21 @@
         public string FileName { get; set; } = string.Empty;
     }
     
-    // Classe para os itens de seleção de sites
     private class SiteSelectionItem
     {
         public string Name { get; set; } = string.Empty;
         public bool IsSelected { get; set; }
+    }
+
+    private string GetUpdateReasonText(FileUpdateReason reason)
+    {
+        return reason switch
+        {
+            FileUpdateReason.FileNotExistsOnServer => "Arquivo não existe no servidor",
+            FileUpdateReason.modifiedDateDifferent => "Data de modificação do arquivo é diferente",
+            FileUpdateReason.DifferentSize => "Tamanho do arquivo é diferente",
+            FileUpdateReason.Ignored => "Arquivo ignorado",
+            _ => "Desconhecido"
+        };
     }
 } 

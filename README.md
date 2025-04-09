@@ -21,6 +21,7 @@
 - [X] [1] [5] Identificar por que todos os arquivos estão sendo atualizados
 - [X] [1] [5] Arrumar bug que está atualizando a data hora dos arquivos
 - [ ] [3] [5] Quando atualização por grupo, validar os arquivos site por site e não só o primeiro
+- [ ] [3] [5] Quando atualização por grupo, backup
 
 #### Feedback ao Usuário
 - [X] [1] [2] Exibir mensagem de sucesso ou falha após a operação de enviar arquivos modificados
@@ -54,15 +55,12 @@
 - [ ] [1] [2] Adicionar verificação de erros comuns
 
 ### Monitoramento e Scripts
-- [ ] [1] [3] Desenvolver interface para criação de scripts customizados
-- [ ] [2] [3] Implementar executor seguro de scripts
-- [ ] [2] [3] Criar biblioteca de funções comuns para scripts
-- [ ] [1] [3] Desenvolver sistema de alertas baseado nos resultados dos scripts
+- [ ] [3] [3] Desenvolver interface para criação de scripts customizados
+- [ ] [5] [3] Desenvolver sistema de alertas baseado nos resultados dos scripts
 
 ### Conectividade
 - [ ] [1] [2] Criar interface para gerenciar múltiplas conexões
 - [ ] [2] [2] Implementar pool de conexões a servidores
-- [ ] [2] [2] Desenvolver mecanismo de balanceamento de requisições
 - [ ] [1] [2] Adicionar dashboard consolidado para múltiplos servidores
 
 ### Expansão de Plataforma

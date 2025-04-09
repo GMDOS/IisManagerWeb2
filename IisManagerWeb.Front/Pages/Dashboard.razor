@@ -55,17 +55,17 @@
         <!-- Gráfico combinado de CPU e Memória -->
         <MudItem xs="12">
             <MudPaper Elevation="2" Class="pa-4 chart-container">
-                <MudText Typo="Typo.h6" Class="mb-4">Utilização de CPU e Memória (Última Hora)</MudText>
+                <MudText Typo="Typo.h6" Class="mb-4">Utilização de CPU e Memória (Últimos 5 Minutos)</MudText>
                 @if (_metricsHistory?.Metrics != null && _metricsHistory.Metrics.Any())
                 {
-                    <div style="height: 350px;">
-                        <MudTimeSeriesChart ChartSeries="@_timeSeriesList"
-                                           Width="100%"
-                                           Height="350px"
-                                           ChartOptions="@_chartOptions"
-                                           CanHideSeries="true"
-                                           TimeLabelSpacing="TimeSpan.FromMinutes(10)"
-                                           DataMarkerTooltipTimeLabelFormat="dd/MM HH:mm:ss" />
+                    <div style="height: 350px;" @onmouseenter="() => _atualizarGrafico = false" @onmouseleave="() => _atualizarGrafico = true">
+                        <MudChart ChartType="ChartType.Line" 
+                                 ChartSeries="@_series" 
+                                 XAxisLabels="@_xAxisLabels" 
+                                 Width="100%" 
+                                 Height="350px" 
+                                 ChartOptions="@_chartOptions" 
+                                 AxisChartOptions="@_axisChartOptions" />
                     </div>
                 }
                 else
@@ -125,10 +125,9 @@
     private ServerMetrics? _currentMetrics;
     private List<SiteMetrics>? _siteMetrics;
     private ServerMetricsHistory? _metricsHistory;
-    private List<TimeSeriesChartSeries> _timeSeriesList = new();
     private int _refreshInterval = 30;
     private bool _isConnected;
-    private int _selectedIndex = -1;
+    private bool _atualizarGrafico = true;
 
     // Configurações do gráfico
     private ChartOptions _chartOptions = new ChartOptions()
@@ -139,7 +138,16 @@
         XAxisLines = false,
         YAxisRequireZeroPoint = true
     };
-    
+
+    private AxisChartOptions _axisChartOptions = new AxisChartOptions()
+    {
+        XAxisLabelRotation = 0,
+        MatchBoundsToSize = true
+    };
+
+    private List<ChartSeries> _series = new List<ChartSeries>();
+    private string[] _xAxisLabels = Array.Empty<string>();
+
     protected override async Task OnInitializedAsync()
     {
         try 
@@ -165,41 +173,41 @@
     
     private void UpdateChartData()
     {
-        if (_metricsHistory?.Metrics == null || !_metricsHistory.Metrics.Any())
+        if (_metricsHistory?.Metrics == null || !_metricsHistory.Metrics.Any() || !_atualizarGrafico)
             return;
-        
+
         // Ordenar métricas por timestamp
         var metrics = _metricsHistory.Metrics.OrderBy(m => m.Timestamp).ToList();
-        
-        // Limpar séries existentes
-        _timeSeriesList.Clear();
-        
+
         // Criar séries de dados para CPU e Memória
-        var cpuSeries = new TimeSeriesChartSeries
+        _series = new List<ChartSeries>
         {
-            Index = 0,
-            Name = "CPU (%)",
-            Data = metrics.Select(m => new TimeSeriesChartSeries.TimeValue(m.Timestamp.ToLocalTime(), m.CpuUsage)).ToList(),
-            IsVisible = true,
-            LineDisplayType = LineDisplayType.Line,
-            DataMarkerTooltipTitleFormat = "{{X_VALUE}}",
-            DataMarkerTooltipSubtitleFormat = "CPU: {{Y_VALUE}}%",
+            new ChartSeries
+            {
+                Name = "CPU (%)",
+                Data = metrics.Select(m => m.CpuUsage).ToArray(),
+                LineDisplayType = LineDisplayType.Line
+            },
+            new ChartSeries
+            {
+                Name = "Memória (%)",
+                Data = metrics.Select(m => m.MemoryUsage).ToArray(),
+                LineDisplayType = LineDisplayType.Line
+            }
         };
-        
-        var memorySeries = new TimeSeriesChartSeries
-        {
-            Index = 1,
-            Name = "Memória (%)",
-            Data = metrics.Select(m => new TimeSeriesChartSeries.TimeValue(m.Timestamp.ToLocalTime(), m.MemoryUsage)).ToList(),
-            IsVisible = true,
-            LineDisplayType = LineDisplayType.Line,
-            DataMarkerTooltipTitleFormat = "{{X_VALUE}}",
-            DataMarkerTooltipSubtitleFormat = "Memória: {{Y_VALUE}}%"
-        };
-        
-        _timeSeriesList.Add(cpuSeries);
-        _timeSeriesList.Add(memorySeries);
-        
+
+        // Criar labels do eixo X baseados no timestamp
+        var labels = metrics.Select(m => m.Timestamp.ToLocalTime().ToString("HH:mm")).ToArray();
+        _xAxisLabels = labels.Select((label, index) => 
+            index == 0 || index == labels.Length - 1 ? label : string.Empty).ToArray();
+
+        // Manter apenas os últimos 5 minutos
+        var cutoffTime = DateTime.UtcNow.AddMinutes(-5);
+        _metricsHistory.Metrics = _metricsHistory.Metrics
+            .Where(m => m.Timestamp >= cutoffTime)
+            .OrderBy(m => m.Timestamp)
+            .ToList();
+
         StateHasChanged();
     }
     
@@ -226,13 +234,6 @@
         if (_metricsHistory != null)
         {
             _metricsHistory.Metrics.Add(metrics);
-            
-            // Manter apenas a última hora
-            var cutoffTime = DateTime.UtcNow.AddHours(-1);
-            _metricsHistory.Metrics = _metricsHistory.Metrics
-                .Where(m => m.Timestamp >= cutoffTime)
-                .OrderBy(m => m.Timestamp)
-                .ToList();
             
             UpdateChartData();
         }

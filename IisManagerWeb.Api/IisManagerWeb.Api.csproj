@@ -4,9 +4,9 @@
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <InvariantGlobalization>true</InvariantGlobalization>
+        <!--<InvariantGlobalization>true</InvariantGlobalization>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-        <PublishAot>true</PublishAot>
+        <PublishAot>true</PublishAot>-->
     </PropertyGroup>
 
     <ItemGroup>

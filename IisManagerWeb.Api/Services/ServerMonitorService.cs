@@ -262,7 +262,7 @@ public class ServerMonitorService
     }
     
     /// <summary>
-    /// Adiciona uma nova leitura ao histórico e mantém apenas a última hora
+    /// Adiciona uma nova leitura ao histórico e mantém apenas os últimos 5 minutos
     /// </summary>
     public void UpdateMetricsHistory(ServerMetrics metrics)
     {
@@ -270,22 +270,26 @@ public class ServerMonitorService
         {
             _metricsHistory.Add(metrics);
             
-            // Remover métricas mais antigas que 1 hora
-            var cutoffTime = DateTime.UtcNow.AddHours(-1);
+            // Remover métricas mais antigas que 5 minutos
+            var cutoffTime = DateTime.UtcNow.AddMinutes(-5);
             _metricsHistory.RemoveAll(m => m.Timestamp < cutoffTime);
         }
     }
     
     /// <summary>
-    /// Obtém o histórico de métricas da última hora
+    /// Obtém o histórico de métricas dos últimos 5 minutos
     /// </summary>
     public ServerMetricsHistory GetMetricsHistory()
     {
         lock (_historyLock)
         {
+            var cutoffTime = DateTime.UtcNow.AddMinutes(-5);
             return new ServerMetricsHistory
             {
-                Metrics = _metricsHistory.OrderBy(m => m.Timestamp).ToList()
+                Metrics = _metricsHistory
+                    .Where(m => m.Timestamp >= cutoffTime)
+                    .OrderBy(m => m.Timestamp)
+                    .ToList()
             };
         }
     }

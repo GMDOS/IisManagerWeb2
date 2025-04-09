@@ -28,7 +28,7 @@ public class MetricsService : IAsyncDisposable
         
         // Converter URL HTTP para WebSocket
         var baseUrl = httpClient.BaseAddress?.ToString() ?? "http://localhost:5135/";
-        _wsBaseUrl = baseUrl.Replace("http://", "ws://").Replace("https://", "wss://");
+        _wsBaseUrl = baseUrl.Replace("http://", "ws://").Replace("https://", "wss://").Replace("/api/api","/");
     }
     
     /// <summary>
@@ -50,7 +50,7 @@ public class MetricsService : IAsyncDisposable
     }
     
     /// <summary>
-    /// Obtém o histórico de métricas da última hora
+    /// Obtém o histórico de métricas dos últimos 5 minutos
     /// </summary>
     public async Task<ServerMetricsHistory> GetMetricsHistoryAsync()
     {

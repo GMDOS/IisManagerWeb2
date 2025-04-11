@@ -92,7 +92,6 @@
 - [ ] [1] [1] Pesquisar métodos de replicação para diferentes bancos
 - [ ] [3] [1] Implementar interface para configuração de replicação
 - [ ] [3] [1] Desenvolver monitor de status da replicação
-- [ ] [2] [1] Criar ferramentas para resolução de conflitos
 
 ### Notificações
 #### Telegram

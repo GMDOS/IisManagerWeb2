@@ -286,9 +286,51 @@
             isAnalyzing = true;
             StateHasChanged();
             
-            string referenceSite = SelectedSites.First();
+            // Verificar cada site individualmente
+            var allFilesToUpdate = new HashSet<string>();
+            var allFiles = new List<FileUpdateInfo>();
+            var allIgnoredFiles = new List<FileUpdateInfo>();
             
-            fileCheckResponse = await SiteService.CheckFilesForUpdateAsync(referenceSite, clientFiles);
+            foreach (var site in SelectedSites)
+            {
+                var siteResponse = await SiteService.CheckFilesForUpdateAsync(site, clientFiles);
+                
+                // Adicionar arquivos para atualizar à lista consolidada
+                foreach (var file in siteResponse.FilesToUpdate)
+                {
+                    allFilesToUpdate.Add(file);
+                }
+                
+                // Consolidar informações de todos os arquivos
+                foreach (var file in siteResponse.Files)
+                {
+                    // Verificar se já existe um arquivo com o mesmo caminho relativo
+                    var existingFile = allFiles.FirstOrDefault(f => f.RelativePath == file.RelativePath);
+                    if (existingFile == null)
+                    {
+                        allFiles.Add(file);
+                    }
+                }
+                
+                // Consolidar informações de arquivos ignorados
+                foreach (var file in siteResponse.IgnoredFiles)
+                {
+                    // Evitar adicionar arquivos duplicados
+                    var existingIgnoredFile = allIgnoredFiles.FirstOrDefault(f => f.RelativePath == file.RelativePath);
+                    if (existingIgnoredFile == null)
+                    {
+                        allIgnoredFiles.Add(file);
+                    }
+                }
+            }
+            
+            // Criar resposta consolidada
+            fileCheckResponse = new FileCheckResponse
+            {
+                FilesToUpdate = allFilesToUpdate.ToList(),
+                Files = allFiles,
+                IgnoredFiles = allIgnoredFiles
+            };
             
             isAnalyzing = false;
             analyzed = true;
@@ -349,37 +391,16 @@
                 }
             }
             
-            var sitesAtualizados = 0;
-            
-            foreach (var siteName in SelectedSites)
+            try
             {
-                try
-                {
-                    foreach (var file in filesToSend)
-                    {
-                        file.Value.Position = 0;
-                    }
-                    
-                    await SiteService.UpdateSpecificFilesAsync(siteName, filesToSend, filesLastModified);
-                    sitesAtualizados++;
-                }
-                catch (Exception ex)
-                {
-                    message = $"Erro ao atualizar o site {siteName}: {ex.Message}";
-                    alertSeverity = Severity.Error;
-                    break;
-                }
-            }
-            
-            if (sitesAtualizados == SelectedSites.Count)
-            {
-                message = $"Todos os {sitesAtualizados} sites foram atualizados com sucesso.";
+                await SiteService.UpdateSpecificFilesInMultipleSitesAsync(SelectedSites.ToList(), filesToSend, filesLastModified);
+                message = $"Todos os {SelectedSites.Count} sites foram atualizados com sucesso.";
                 alertSeverity = Severity.Success;
             }
-            else
+            catch (Exception ex)
             {
-                message = $"{sitesAtualizados} de {SelectedSites.Count} sites foram atualizados.";
-                alertSeverity = Severity.Warning;
+                message = $"Erro ao atualizar os sites: {ex.Message}";
+                alertSeverity = Severity.Error;
             }
         }
         catch (Exception ex)

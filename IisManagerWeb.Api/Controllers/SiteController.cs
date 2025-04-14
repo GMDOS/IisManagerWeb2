@@ -635,7 +635,7 @@ public static class SiteController
         var backupFileName = Path.Combine(backupDir, $"backup_{siteName}_{timestamp}.zip");
 
         System.IO.Compression.ZipFile.CreateFromDirectory(physicalPath, backupFileName);
-        
+        Console.WriteLine($"Backup criado em: {backupFileName} para o site: {siteName}");
         return backupFileName;
     }
 

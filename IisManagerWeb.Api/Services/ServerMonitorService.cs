@@ -50,21 +50,17 @@ public class ServerMonitorService
     {
         try
         {
-            // Inicializar apenas contadores seguros primeiro
             _cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total", true);
             _memoryCounter = new PerformanceCounter("Memory", "Available MBytes", true);
             
-            // Inicializa os contadores seguros para leitura inicial
             _cpuCounter.NextValue();
             _memoryCounter.NextValue();
             
             try 
             {
-                // Tentar inicializar contadores do Web Service separadamente
                 _requestsCounter = new PerformanceCounter("Web Service", "Total Method Requests/sec", "_Total", true);
                 _connectionsCounter = new PerformanceCounter("Web Service", "Current Connections", "_Total", true);
                 
-                // Leitura inicial usando NextValue() (evita NextSample que está causando problemas)
                 _requestsCounter.NextValue();
                 _connectionsCounter.NextValue();
                 
@@ -83,7 +79,6 @@ public class ServerMonitorService
         {
             Console.WriteLine($"Erro de permissão ao inicializar contadores de performance: {ex.Message}");
             Console.WriteLine("Isto pode ocorrer se a aplicação não está sendo executada como administrador.");
-            // Definimos como null e usaremos métodos alternativos
             _cpuCounter = null;
             _memoryCounter = null;
             _requestsCounter = null;
@@ -93,7 +88,6 @@ public class ServerMonitorService
         {
             Console.WriteLine($"Erro ao inicializar contadores de performance: {ex.ToString()}");
             Console.WriteLine("Usando métodos alternativos para métricas do sistema");
-            // Definimos como null e usaremos métodos alternativos
             _cpuCounter = null;
             _memoryCounter = null;
             _requestsCounter = null;
@@ -198,9 +192,7 @@ public class ServerMonitorService
             {
                 try 
                 {
-                    // Tenta obter informações de conexões via processos do IIS
                     using var serverManager = new ServerManager();
-                    // Uma aproximação do número de conexões ativas
                     currentConnections = serverManager.Sites.Count(site => site.State == ObjectState.Started);
                 }
                 catch 
@@ -244,7 +236,6 @@ public class ServerMonitorService
                 {
                     try
                     {
-                        // Usando o formato correto baseado na saída do PowerShell e mudando para um contador diferente
                         // var requestCounter = new PerformanceCounter("Web Service", "Get Requests/sec", siteName, true);
                         // _siteRequestCounters[siteName + "_requests"] = requestCounter;
                         // requestCounter.NextValue();
@@ -310,7 +301,6 @@ public class ServerMonitorService
         {
             _metricsHistory.Add(metrics);
             
-            // Remover métricas mais antigas que 5 minutos
             var cutoffTime = DateTime.UtcNow.AddMinutes(-5);
             _metricsHistory.RemoveAll(m => m.Timestamp < cutoffTime);
         }
@@ -372,7 +362,6 @@ public class ServerMonitorService
             }
         }
         
-        // Remover conexões fechadas
         foreach (var id in deadConnections)
         {
             RemoveClient(id);
@@ -386,7 +375,6 @@ public class ServerMonitorService
     {
         try
         {
-            // Método alternativo usando API Win32 para Windows
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 var memStatus = new MemoryStatusEx { dwLength = (uint)Marshal.SizeOf(typeof(MemoryStatusEx)) };
@@ -396,7 +384,6 @@ public class ServerMonitorService
                 }
             }
             
-            // Alternativa para Linux usando /proc/meminfo
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 if (File.Exists("/proc/meminfo"))
@@ -410,29 +397,6 @@ public class ServerMonitorService
                 }
             }
             
-            // Alternativa para macOS
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "sysctl",
-                    Arguments = "-n hw.memsize",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false
-                };
-                
-                using var process = Process.Start(startInfo);
-                if (process != null)
-                {
-                    var output = process.StandardOutput.ReadToEnd().Trim();
-                    if (long.TryParse(output, out var totalBytes))
-                    {
-                        return Math.Round(totalBytes / 1024.0 / 1024.0, 2);
-                    }
-                }
-            }
-
-            // Fallback usando GC
             return Math.Round(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 1024.0 / 1024.0, 2);
         }
         catch (Exception ex)
@@ -449,7 +413,6 @@ public class ServerMonitorService
     {
         try
         {
-            // Método alternativo usando API Win32 para Windows
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 var memStatus = new MemoryStatusEx { dwLength = (uint)Marshal.SizeOf(typeof(MemoryStatusEx)) };
@@ -459,7 +422,6 @@ public class ServerMonitorService
                 }
             }
             
-            // Alternativa para Linux usando /proc/meminfo
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 if (File.Exists("/proc/meminfo"))
@@ -471,7 +433,6 @@ public class ServerMonitorService
                         return Math.Round(availableKb / 1024.0, 2);
                     }
                     
-                    // Caso MemAvailable não exista, tente calcular através de MemFree + Buffers + Cached
                     var matchFree = System.Text.RegularExpressions.Regex.Match(memInfo, @"MemFree:\s+(\d+)\s+kB");
                     var matchBuffers = System.Text.RegularExpressions.Regex.Match(memInfo, @"Buffers:\s+(\d+)\s+kB");
                     var matchCached = System.Text.RegularExpressions.Regex.Match(memInfo, @"Cached:\s+(\d+)\s+kB");
@@ -486,62 +447,6 @@ public class ServerMonitorService
                 }
             }
             
-            // Alternativa para macOS
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "vm_stat",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false
-                };
-                
-                using var process = Process.Start(startInfo);
-                if (process != null)
-                {
-                    var output = process.StandardOutput.ReadToEnd();
-                    
-                    // Analisar a saída para encontrar páginas livres
-                    var pageSize = 4096; // Tamanho de página padrão em bytes
-                    var freePages = 0L;
-                    
-                    // Obter o tamanho da página real
-                    var pageSizeProcess = Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "sysctl",
-                        Arguments = "-n hw.pagesize",
-                        RedirectStandardOutput = true,
-                        UseShellExecute = false
-                    });
-                    
-                    if (pageSizeProcess != null)
-                    {
-                        var pageSizeOutput = pageSizeProcess.StandardOutput.ReadToEnd().Trim();
-                        if (int.TryParse(pageSizeOutput, out var parsedPageSize))
-                        {
-                            pageSize = parsedPageSize;
-                        }
-                    }
-                    
-                    // Procurar por linhas com contagem de páginas
-                    var freeMatch = System.Text.RegularExpressions.Regex.Match(output, @"Pages free:\s+(\d+)");
-                    if (freeMatch.Success && long.TryParse(freeMatch.Groups[1].Value, out var pages))
-                    {
-                        freePages += pages;
-                    }
-                    
-                    // Também considerar páginas inativas
-                    var inactiveMatch = System.Text.RegularExpressions.Regex.Match(output, @"Pages inactive:\s+(\d+)");
-                    if (inactiveMatch.Success && long.TryParse(inactiveMatch.Groups[1].Value, out pages))
-                    {
-                        freePages += pages;
-                    }
-                    
-                    return Math.Round((freePages * pageSize) / 1024.0 / 1024.0, 2);
-                }
-            }
-            
-            // Fallback usando GC
             return Math.Round(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 1024.0 / 1024.0, 2);
         }
         catch (Exception ex)
@@ -555,12 +460,10 @@ public class ServerMonitorService
     {
         try
         {
-            // Para Linux
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 if (File.Exists("/proc/stat"))
                 {
-                    // Leitura inicial
                     var initialStat = File.ReadAllLines("/proc/stat")[0];
                     var initialParts = initialStat.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                     
@@ -569,10 +472,8 @@ public class ServerMonitorService
                     var initialIdle = long.Parse(initialParts[4]);
                     var initialTotal = initialParts.Skip(1).Take(4).Sum(p => long.Parse(p));
                     
-                    // Espere um curto período
                     Thread.Sleep(200);
                     
-                    // Segunda leitura
                     var nextStat = File.ReadAllLines("/proc/stat")[0];
                     var nextParts = nextStat.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                     
@@ -581,7 +482,6 @@ public class ServerMonitorService
                     var nextIdle = long.Parse(nextParts[4]);
                     var nextTotal = nextParts.Skip(1).Take(4).Sum(p => long.Parse(p));
                     
-                    // Calcular diferença
                     var idleDelta = nextIdle - initialIdle;
                     var totalDelta = nextTotal - initialTotal;
                     
@@ -590,7 +490,6 @@ public class ServerMonitorService
                     return Math.Round(100.0 * (1.0 - (idleDelta / (double)totalDelta)), 2);
                 }
             }          
-            // Para Windows, tentar método alternativo baseado em WMI
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 var startInfo = new ProcessStartInfo

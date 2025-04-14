@@ -286,7 +286,6 @@
             isAnalyzing = true;
             StateHasChanged();
             
-            // Verificar cada site individualmente
             var allFilesToUpdate = new HashSet<string>();
             var allFiles = new List<FileUpdateInfo>();
             var allIgnoredFiles = new List<FileUpdateInfo>();
@@ -295,16 +294,13 @@
             {
                 var siteResponse = await SiteService.CheckFilesForUpdateAsync(site, clientFiles);
                 
-                // Adicionar arquivos para atualizar à lista consolidada
                 foreach (var file in siteResponse.FilesToUpdate)
                 {
                     allFilesToUpdate.Add(file);
                 }
                 
-                // Consolidar informações de todos os arquivos
                 foreach (var file in siteResponse.Files)
                 {
-                    // Verificar se já existe um arquivo com o mesmo caminho relativo
                     var existingFile = allFiles.FirstOrDefault(f => f.RelativePath == file.RelativePath);
                     if (existingFile == null)
                     {
@@ -312,10 +308,8 @@
                     }
                 }
                 
-                // Consolidar informações de arquivos ignorados
                 foreach (var file in siteResponse.IgnoredFiles)
                 {
-                    // Evitar adicionar arquivos duplicados
                     var existingIgnoredFile = allIgnoredFiles.FirstOrDefault(f => f.RelativePath == file.RelativePath);
                     if (existingIgnoredFile == null)
                     {
@@ -324,7 +318,6 @@
                 }
             }
             
-            // Criar resposta consolidada
             fileCheckResponse = new FileCheckResponse
             {
                 FilesToUpdate = allFilesToUpdate.ToList(),

@@ -129,7 +129,6 @@
     private bool _isConnected;
     private bool _atualizarGrafico = true;
 
-    // Configurações do gráfico
     private ChartOptions _chartOptions = new ChartOptions()
     {
         LineStrokeWidth = 2,
@@ -152,16 +151,13 @@
     {
         try 
         {
-            // Registrar callbacks para receber atualizações
             MetricsService.OnMetricsUpdate(HandleMetricsUpdate);
             MetricsService.OnSiteMetricsUpdate(HandleSiteMetricsUpdate);
             MetricsService.OnRefreshIntervalUpdate(HandleRefreshIntervalUpdate);
             
-            // Carregar histórico de métricas
             _metricsHistory = await MetricsService.GetMetricsHistoryAsync();
             UpdateChartData();
 
-            // Conectar ao WebSocket para receber atualizações em tempo real
             await ConnectToWebSocketAsync();
 
         }
@@ -176,10 +172,8 @@
         if (_metricsHistory?.Metrics == null || !_metricsHistory.Metrics.Any() || !_atualizarGrafico)
             return;
 
-        // Ordenar métricas por timestamp
         var metrics = _metricsHistory.Metrics.OrderBy(m => m.Timestamp).ToList();
 
-        // Criar séries de dados para CPU e Memória
         _series = new List<ChartSeries>
         {
             new ChartSeries
@@ -196,12 +190,10 @@
             }
         };
 
-        // Criar labels do eixo X baseados no timestamp
         var labels = metrics.Select(m => m.Timestamp.ToLocalTime().ToString("HH:mm")).ToArray();
         _xAxisLabels = labels.Select((label, index) => 
             index == 0 || index == labels.Length - 1 ? label : string.Empty).ToArray();
 
-        // Manter apenas os últimos 5 minutos
         var cutoffTime = DateTime.UtcNow.AddMinutes(-5);
         _metricsHistory.Metrics = _metricsHistory.Metrics
             .Where(m => m.Timestamp >= cutoffTime)

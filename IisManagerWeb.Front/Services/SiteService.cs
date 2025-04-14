@@ -11,8 +11,6 @@ public class SiteService
     public SiteService(HttpClient httpClient)
     {
         _httpClient = httpClient;
-        // Comentando esta linha pois o BaseAddress já está configurado no Program.cs
-        // _httpClient.BaseAddress = new Uri("http://localhost:5135/");
     }
 
     public async Task<List<SiteDto>> GetSitesAsync()

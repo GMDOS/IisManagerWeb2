@@ -32,12 +32,10 @@ public class UploadFileService : IUploadFileService
     {
         try
         {
-            // Lê o arquivo para um array de bytes
             using var ms = new MemoryStream();
             await fileStream.CopyToAsync(ms);
             var fileBytes = ms.ToArray();
             
-            // Envia para o serviço de sites
             await _siteService.UpdateSiteFilesAsync(siteName, fileBytes);
             
             return new ServiceResult { Succeeded = true };

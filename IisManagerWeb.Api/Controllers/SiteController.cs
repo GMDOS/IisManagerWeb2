@@ -29,7 +29,6 @@ public static class SiteController
             return Results.Ok(siteDto);
         });
 
-        // Iniciar site
         siteApi.MapPost("/{name}/start", (string name) =>
         {
             using var serverManager = new ServerManager();
@@ -40,7 +39,6 @@ public static class SiteController
             return Results.Ok();
         });
 
-        // Parar site
         siteApi.MapPost("/{name}/stop", (string name) =>
         {
             using var serverManager = new ServerManager();
@@ -51,7 +49,6 @@ public static class SiteController
             return Results.Ok();
         });
 
-        // Reiniciar site
         siteApi.MapPost("/{name}/restart", (string name) =>
         {
             using var serverManager = new ServerManager();
@@ -74,7 +71,6 @@ public static class SiteController
             return Results.Ok();
         });
 
-        // Atualizar certificado
         siteApi.MapPut("/{name}/certificate", (string name, string certificateHash, string certificateStoreName) =>
         {
             using var serverManager = new ServerManager();
@@ -135,7 +131,6 @@ public static class SiteController
             return Results.Ok();
         });
 
-        // Atualizar arquivos do site
         siteApi.MapPost("/{name}/update-files", async (string name, HttpRequest request) =>
         {
             try
@@ -188,7 +183,6 @@ public static class SiteController
             }
         });
 
-        // Verificar quais arquivos precisam ser atualizados
         siteApi.MapPost("/{name}/check-files", async (string name, HttpRequest request) =>
         {
             try
@@ -345,7 +339,6 @@ public static class SiteController
             }
         });
 
-        // Atualizar arquivos específicos do site
         siteApi.MapPost("/{name}/update-specific-files", async (string name, HttpRequest request) =>
         {
             try
@@ -383,7 +376,6 @@ public static class SiteController
                 if (site.State == ObjectState.Started)
                     site.Stop();
 
-                // Criar backup do site antes de atualizar
                 var backupFileName = CreateSiteBackup(name, physicalPath);
 
                 var form = await request.ReadFormAsync();
@@ -451,7 +443,6 @@ public static class SiteController
             }
         });
 
-        // Atualizar arquivos em múltiplos sites
         siteApi.MapPost("/update-multiple", async (HttpRequest request) =>
         {
             try
@@ -535,7 +526,6 @@ public static class SiteController
                             site.Stop();
                         }
 
-                        // Criar backup do site antes de atualizar
                         var backupFileName = CreateSiteBackup(siteName, physicalPath);
                         backupsCriados.Add(siteName, backupFileName);
 

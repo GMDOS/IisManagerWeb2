@@ -14,28 +14,24 @@ public static class MetricsController
     {
         var metricsApi = app.MapGroup("/metrics");
         
-        // Obter métricas atuais
         metricsApi.MapGet("/current", (ServerMonitorService monitorService) =>
         {
             var metrics = monitorService.GetCurrentMetrics();
             return Results.Ok(metrics);
         });
         
-        // Obter métricas de sites
         metricsApi.MapGet("/sites", (ServerMonitorService monitorService) =>
         {
             var metrics = monitorService.GetSiteMetrics();
             return Results.Ok(metrics);
         });
         
-        // Obter histórico de métricas
         metricsApi.MapGet("/history", (ServerMonitorService monitorService) =>
         {
             var history = monitorService.GetMetricsHistory();
             return Results.Ok(history);
         });
         
-        // WebSocket para métricas em tempo real
         app.Use(async (context, next) =>
         {
             if (context.Request.Path == "/metrics/ws")
@@ -48,7 +44,6 @@ public static class MetricsController
                     
                     monitorService.AddClient(clientId, webSocket);
                     
-                    // Enviar mensagem inicial
                     var initialMetrics = monitorService.GetCurrentMetrics();
                     var initialSiteMetrics = monitorService.GetSiteMetrics();
                     
@@ -67,7 +62,6 @@ public static class MetricsController
                     
                     await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
                     
-                    // Manter a conexão aberta
                     try
                     {
                         var buffer2 = new byte[1024 * 4];
@@ -75,7 +69,6 @@ public static class MetricsController
                         
                         while (webSocket.State == WebSocketState.Open)
                         {
-                            // Receber mensagens do cliente (ping/pong ou comandos)
                             var result = await webSocket.ReceiveAsync(receiveBuffer, CancellationToken.None);
                             
                             if (result.MessageType == WebSocketMessageType.Close)

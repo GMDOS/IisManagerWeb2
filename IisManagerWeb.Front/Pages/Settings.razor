@@ -144,12 +144,10 @@
     {
         try
         {
-            // Carrega as configurações do servidor
             settings = await SettingsService.GetSettingsAsync();
         }
         catch (Exception ex)
         {
-            // Em caso de erro, usa as configurações padrão
             Console.WriteLine($"Erro ao carregar configurações: {ex.Message}");
             settings = new ManagerSettings();
         }
@@ -160,7 +158,6 @@
         if (string.IsNullOrWhiteSpace(newIgnorePattern))
             return;
             
-        // Evitar duplicatas
         if (!settings.IgnoredFiles.Contains(newIgnorePattern))
         {
             settings.IgnoredFiles.Add(newIgnorePattern);
@@ -183,7 +180,6 @@
             try
             {
                 isSaving = true;
-                // Salva as configurações no servidor
                 await SettingsService.SaveSettingsAsync(settings);
                 
                 Snackbar.Add("Configurações salvas com sucesso!", Severity.Success);

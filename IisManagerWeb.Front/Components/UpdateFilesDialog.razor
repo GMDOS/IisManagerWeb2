@@ -63,21 +63,17 @@
     private string message = string.Empty;
     private Severity alertSeverity = Severity.Info;
     
-    // Método chamado quando um arquivo é selecionado
     private void OnInputFileChanged(InputFileChangeEventArgs e)
     {
         file = e.File;
         StateHasChanged();
     }
     
-    // Método para fechar o diálogo
     private void Cancel()
     {
-        // Usa o método Cancel do MudDialog para fechar o diálogo
         MudDialog?.Cancel();
     }
     
-    // Método para processar o upload do arquivo
     private async Task Upload()
     {
         if (file == null || isUploading) return;
@@ -88,7 +84,6 @@
         
         try
         {
-            // Upload de arquivo - tamanho máximo 100MB
             using var stream = file.OpenReadStream(100 * 1024 * 1024);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);

@@ -667,7 +667,6 @@
     {
         if (!selectedSites.Any()) return;
 
-        // Primeiro fechamos o menu
         CloseMenu();
 
         try
@@ -690,7 +689,6 @@
     {
         if (!selectedSites.Any()) return;
 
-        // Primeiro fechamos o menu
         CloseMenu();
 
         try
@@ -713,7 +711,6 @@
     {
         if (!selectedSites.Any()) return;
 
-        // Primeiro fechamos o menu
         CloseMenu();
 
         try
@@ -736,15 +733,12 @@
     {
         if (selectedSites.Count != 1) return;
 
-        // Fechamos o menu antes de abrir o diálogo
         CloseMenu();
 
         try
         {
-            // Limpar possíveis diálogos pendentes
             await Task.Delay(100);
 
-            // Parâmetros para o diálogo
             var parameters = new DialogParameters
             {
                 ["SiteName"] = selectedSites[0].Name
@@ -758,21 +752,17 @@
                 NoHeader = true
             };
 
-            // Abre o diálogo através do serviço, com await para garantir que o diálogo está pronto
             var dialog = await DialogService.ShowAsync<UpdateFilesDialog>("", parameters, options);
 
             try
             {
-                // Aguarda o resultado do diálogo
                 await dialog.Result;
             }
             catch (Exception)
             {
-                // Ignora erros no resultado do diálogo
             }
             finally
             {
-                // Atualiza os sites independente do resultado
                 await RefreshSites();
             }
         }
@@ -787,21 +777,17 @@
     {
         if (selectedSites.Count != 1) return;
 
-        // Fechamos o menu antes de abrir o diálogo
         CloseMenu();
 
         try
         {
-            // Limpar possíveis diálogos pendentes
             await Task.Delay(100);
 
-            // Parâmetros para o diálogo
             var parameters = new DialogParameters
             {
                 ["SiteName"] = selectedSites[0].Name
             };
 
-            // Configurações do diálogo - configurações mínimas para reduzir problemas
             var options = new DialogOptions
             {
                 CloseOnEscapeKey = true,
@@ -810,21 +796,17 @@
                 NoHeader = true
             };
 
-            // Abre o diálogo através do serviço, com await para garantir que o diálogo está pronto
             var dialog = await DialogService.ShowAsync<UpdateFolderDialog>("", parameters, options);
 
             try
             {
-                // Aguarda o resultado do diálogo
                 await dialog.Result;
             }
             catch (Exception)
             {
-                // Ignora erros no resultado do diálogo
             }
             finally
             {
-                // Atualiza os sites independente do resultado
                 await RefreshSites();
             }
         }
@@ -839,10 +821,8 @@
     {
         try
         {
-            // Limpar possíveis diálogos pendentes
             await Task.Delay(100);
 
-            // Configurações do diálogo
             var options = new DialogOptions
             {
                 CloseOnEscapeKey = true,
@@ -851,21 +831,17 @@
                 NoHeader = true
             };
 
-            // Abre o diálogo através do serviço
             var dialog = await DialogService.ShowAsync<UpdateMultipleSitesDialog>("", options);
 
             try
             {
-                // Aguarda o resultado do diálogo
                 await dialog.Result;
             }
             catch (Exception)
             {
-                // Ignora erros no resultado do diálogo
             }
             finally
             {
-                // Atualiza os sites independente do resultado
                 await RefreshSites();
             }
         }
@@ -882,10 +858,8 @@
         
         try
         {
-            // Limpar possíveis diálogos pendentes
             await Task.Delay(100);
 
-            // Configurações do diálogo
             var options = new DialogOptions
             {
                 CloseOnEscapeKey = true,
@@ -894,27 +868,22 @@
                 NoHeader = true
             };
             
-            // Parâmetros para o diálogo
             var parameters = new DialogParameters
             {
                 ["PreSelectedSiteNames"] = group.SiteNames
             };
 
-            // Abre o diálogo através do serviço
             var dialog = await DialogService.ShowAsync<UpdateMultipleSitesDialog>("", parameters, options);
 
             try
             {
-                // Aguarda o resultado do diálogo
                 await dialog.Result;
             }
             catch (Exception)
             {
-                // Ignora erros no resultado do diálogo
             }
             finally
             {
-                // Atualiza os sites independente do resultado
                 await RefreshSites();
             }
         }

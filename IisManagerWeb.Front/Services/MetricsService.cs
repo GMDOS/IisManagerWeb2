@@ -26,7 +26,6 @@ public class MetricsService : IAsyncDisposable
     {
         _httpClient = httpClient;
         
-        // Converter URL HTTP para WebSocket
         var baseUrl = httpClient.BaseAddress?.ToString() ?? "http://localhost:5135/";
         _wsBaseUrl = baseUrl.Replace("http://", "ws://").Replace("https://", "wss://").Replace("/api/api","/");
     }
@@ -79,7 +78,6 @@ public class MetricsService : IAsyncDisposable
             await _webSocket.ConnectAsync(new Uri($"{_wsBaseUrl}metrics/ws"), _cts.Token);
             Console.WriteLine("WebSocket conectado com sucesso");
             
-            // Iniciar tarefa de recebimento de mensagens
             _ = ReceiveMessagesAsync(_cts.Token);
         }
         catch (Exception ex)
@@ -185,7 +183,6 @@ public class MetricsService : IAsyncDisposable
                 }
                 while (!result.EndOfMessage);
                 
-                // Processar a mensagem completa
                 if (result.MessageType == WebSocketMessageType.Text && ms.Length > 0)
                 {
                     ms.Seek(0, SeekOrigin.Begin);
@@ -198,7 +195,6 @@ public class MetricsService : IAsyncDisposable
                         
                         if (messageType == "metrics")
                         {
-                            // Atualização de métricas
                             if (messageObj.TryGetProperty("data", out var dataElement))
                             {
                                 var metrics = JsonSerializer.Deserialize<ServerMetrics>(dataElement.GetRawText());
@@ -218,7 +214,6 @@ public class MetricsService : IAsyncDisposable
                                 }
                             }
                             
-                            // Atualização de métricas de sites
                             if (messageObj.TryGetProperty("siteMetrics", out var siteMetricsElement))
                             {
                                 var siteMetrics = JsonSerializer.Deserialize<List<SiteMetrics>>(siteMetricsElement.GetRawText());
@@ -240,7 +235,6 @@ public class MetricsService : IAsyncDisposable
                         }
                         else if (messageType == "welcome")
                         {
-                            // Mensagem de boas-vindas com dados iniciais
                             if (messageObj.TryGetProperty("initialData", out var initialDataElement))
                             {
                                 var metrics = JsonSerializer.Deserialize<ServerMetrics>(initialDataElement.GetRawText());
@@ -305,12 +299,10 @@ public class MetricsService : IAsyncDisposable
         }
         catch (OperationCanceledException)
         {
-            // Cancelamento normal, apenas registre
             Console.WriteLine("Recebimento de mensagens do WebSocket cancelado");
         }
         catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
         {
-            // Conexão fechada pelo servidor
             Console.WriteLine("Conexão WebSocket fechada pelo servidor");
             lock (_connectionLock)
             {

@@ -89,11 +89,9 @@
             messageColor = Color.Info;
             StateHasChanged();
             
-            // Ler o arquivo
             var content = new byte[selectedFile.Size];
             await selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).ReadAsync(content);
             
-            // Enviar para o serviço
             await SiteService.UpdateSiteFilesAsync(SiteName, content);
             
             message = "Arquivo enviado com sucesso!";

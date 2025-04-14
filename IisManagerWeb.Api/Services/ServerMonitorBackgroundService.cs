@@ -21,11 +21,9 @@ public class ServerMonitorBackgroundService : BackgroundService
         _logger = logger;
         _settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ManagerSettings.json");
         
-        // Carregar configurações iniciais
         LoadSettingsFromFile();
         
-        // Configurar um timer para recarregar configurações periodicamente
-        _configTimer = new Timer(_ => LoadSettingsFromFile(), null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+            _configTimer = new Timer(_ => LoadSettingsFromFile(), null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
     }
     
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -38,17 +36,13 @@ public class ServerMonitorBackgroundService : BackgroundService
             {
                 try
                 {
-                    // Obter métricas atuais
                     var metrics = _monitorService.GetCurrentMetrics();
                     var siteMetrics = _monitorService.GetSiteMetrics();
                     
-                    // Adicionar ao histórico
                     _monitorService.UpdateMetricsHistory(metrics);
                     
-                    // Enviar para os clientes conectados
                     await _monitorService.BroadcastMetricsAsync(metrics, siteMetrics);
                     
-                    // Aguardar pelo próximo intervalo com base nas configurações
                     await Task.Delay(_monitorService.GetRefreshInterval(), stoppingToken);
                 }
                 catch (Exception ex)
@@ -60,7 +54,6 @@ public class ServerMonitorBackgroundService : BackgroundService
         }
         catch (OperationCanceledException)
         {
-            // Exceção normal durante o encerramento, apenas registre
             _logger.LogInformation("Serviço de monitoramento do servidor está sendo encerrado");
         }
         catch (Exception ex)
@@ -94,7 +87,6 @@ public class ServerMonitorBackgroundService : BackgroundService
                 
                 if (settings != null)
                 {
-                    // Atualiza o intervalo de atualização
                     _monitorService.UpdateRefreshInterval(settings.RefreshInterval);
                     _logger.LogInformation("Configurações carregadas com sucesso. Intervalo de atualização: {RefreshInterval} milissegundos",
                         settings.RefreshInterval);

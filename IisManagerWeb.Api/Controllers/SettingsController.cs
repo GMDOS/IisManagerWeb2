@@ -11,14 +11,12 @@ public static class SettingsController
     {
         var settingsApi = app.MapGroup("/settings");
 
-        // Obter configurações
         settingsApi.MapGet("/", () =>
         {
             try
             {
                 if (!File.Exists(SettingsFilePath))
                 {
-                    // Se o arquivo não existir, cria um com as configurações padrão
                     var defaultSettings = new ManagerSettings();
                     var defaultJson = JsonSerializer.Serialize(defaultSettings, AppJsonSerializerContext.Default.ManagerSettings);
                     File.WriteAllText(SettingsFilePath, defaultJson);
@@ -35,7 +33,6 @@ public static class SettingsController
             }
         });
 
-        // Salvar configurações
         settingsApi.MapPost("/", (ManagerSettings settings) =>
         {
             try
@@ -50,7 +47,6 @@ public static class SettingsController
             }
         });
 
-        // Atualizar configurações de arquivos ignorados
         settingsApi.MapPost("/ignored-files", (List<string> ignoredFiles) =>
         {
             try

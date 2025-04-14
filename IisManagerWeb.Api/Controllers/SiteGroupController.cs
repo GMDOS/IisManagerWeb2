@@ -12,7 +12,6 @@ public static class SiteGroupController
     {
         var groupApi = app.MapGroup("/site-groups");
 
-        // Obter todos os grupos
         groupApi.MapGet("/", () =>
         {
             if (!File.Exists(GroupsFilePath))
@@ -23,7 +22,6 @@ public static class SiteGroupController
             return Results.Ok(groups);
         });
 
-        // Obter grupo específico
         groupApi.MapGet("/{name}", (string name) =>
         {
             if (!File.Exists(GroupsFilePath))
@@ -39,7 +37,6 @@ public static class SiteGroupController
             return Results.Ok(group);
         });
 
-        // Criar novo grupo
         groupApi.MapPost("/", (SiteGroupDto group) =>
         {
             var groups = new List<SiteGroupDto>();
@@ -64,7 +61,6 @@ public static class SiteGroupController
             return Results.Ok(group);
         });
 
-        // Atualizar grupo
         groupApi.MapPut("/{name}", (string name, SiteGroupDto group) =>
         {
             if (!File.Exists(GroupsFilePath))
@@ -86,7 +82,6 @@ public static class SiteGroupController
             return Results.Ok(existingGroup);
         });
 
-        // Deletar grupo
         groupApi.MapDelete("/{name}", (string name) =>
         {
             if (!File.Exists(GroupsFilePath))
@@ -106,7 +101,6 @@ public static class SiteGroupController
             return Results.Ok();
         });
 
-        // Iniciar todos os sites do grupo
         groupApi.MapPost("/{name}/start", async (string name) =>
         {
             if (!File.Exists(GroupsFilePath))
@@ -130,7 +124,6 @@ public static class SiteGroupController
             return Results.Ok();
         });
 
-        // Parar todos os sites do grupo
         groupApi.MapPost("/{name}/stop", async (string name) =>
         {
             if (!File.Exists(GroupsFilePath))

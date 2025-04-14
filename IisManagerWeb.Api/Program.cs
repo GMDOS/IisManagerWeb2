@@ -9,10 +9,9 @@ using IisManagerWeb.Api.Services;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
-// Configuração de HTTPS
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.ListenAnyIP(5000); // HTTP
+    options.ListenAnyIP(5000);
     options.ListenAnyIP(5001, listenOptions =>
     {
         listenOptions.UseHttps();
@@ -75,7 +74,6 @@ builder.Services.AddHostedService<ServerMonitorBackgroundService>();
 
 var app = builder.Build();
 
-// Redirecionamento HTTP para HTTPS
 app.UseHttpsRedirection();
 
 app.UseCors();

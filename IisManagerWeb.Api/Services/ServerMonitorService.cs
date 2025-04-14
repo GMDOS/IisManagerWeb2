@@ -6,12 +6,16 @@ using System.Text.Json;
 using System.Runtime.InteropServices;
 using IisManagerWeb.Shared.Models;
 using Microsoft.Web.Administration;
+using System.Runtime.Versioning;
 
 namespace IisManagerWeb.Api.Services;
 
 /// <summary>
 /// Serviço responsável por monitorar e armazenar métricas do servidor
 /// </summary>
+[SupportedOSPlatform("windows")]
+[UnsupportedOSPlatform("browser")]
+
 public class ServerMonitorService
 {
     private readonly ConcurrentDictionary<string, WebSocket> _clients = new();
@@ -46,16 +50,32 @@ public class ServerMonitorService
     {
         try
         {
+            // Inicializar apenas contadores seguros primeiro
             _cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total", true);
             _memoryCounter = new PerformanceCounter("Memory", "Available MBytes", true);
-            _requestsCounter = new PerformanceCounter("Web Service", "Total Method Requests/sec", "_Total", true);
-            _connectionsCounter = new PerformanceCounter("Web Service", "Current Connections", "_Total", true);
             
-            // Inicializa os contadores para leitura inicial
+            // Inicializa os contadores seguros para leitura inicial
             _cpuCounter.NextValue();
             _memoryCounter.NextValue();
-            _requestsCounter.NextValue();
-            _connectionsCounter.NextValue();
+            
+            try 
+            {
+                // Tentar inicializar contadores do Web Service separadamente
+                _requestsCounter = new PerformanceCounter("Web Service", "Total Method Requests/sec", "_Total", true);
+                _connectionsCounter = new PerformanceCounter("Web Service", "Current Connections", "_Total", true);
+                
+                // Leitura inicial usando NextValue() (evita NextSample que está causando problemas)
+                _requestsCounter.NextValue();
+                _connectionsCounter.NextValue();
+                
+                Console.WriteLine("Contadores IIS inicializados com sucesso");
+            }
+            catch (Exception iisEx)
+            {
+                Console.WriteLine($"Falha ao inicializar contadores IIS: {iisEx.Message}");
+                _requestsCounter = null;
+                _connectionsCounter = null;
+            }
             
             Console.WriteLine("Contadores de performance inicializados com sucesso");
         }
@@ -71,7 +91,7 @@ public class ServerMonitorService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao inicializar contadores de performance: {ex.Message}");
+            Console.WriteLine($"Erro ao inicializar contadores de performance: {ex.ToString()}");
             Console.WriteLine("Usando métodos alternativos para métricas do sistema");
             // Definimos como null e usaremos métodos alternativos
             _cpuCounter = null;
@@ -157,6 +177,10 @@ public class ServerMonitorService
             {
                 requestsPerSecond = Math.Round(_requestsCounter.NextValue(), 2);
             }
+            else 
+            {
+                requestsPerSecond = 0;
+            }
         }
         catch (Exception ex)
         {
@@ -169,6 +193,20 @@ public class ServerMonitorService
             if (_connectionsCounter != null)
             {
                 currentConnections = Math.Round(_connectionsCounter.NextValue(), 2);
+            }
+            else 
+            {
+                try 
+                {
+                    // Tenta obter informações de conexões via processos do IIS
+                    using var serverManager = new ServerManager();
+                    // Uma aproximação do número de conexões ativas
+                    currentConnections = serverManager.Sites.Count(site => site.State == ObjectState.Started);
+                }
+                catch 
+                {
+                    currentConnections = 0;
+                }
             }
         }
         catch (Exception ex)
@@ -206,21 +244,23 @@ public class ServerMonitorService
                 {
                     try
                     {
-                        var requestCounter = new PerformanceCounter("Web Service", "Total Method Requests/sec", siteName, true);
-                        var bytesReceivedCounter = new PerformanceCounter("Web Service", "Bytes Received/sec", siteName, true);
-                        var bytesSentCounter = new PerformanceCounter("Web Service", "Bytes Sent/sec", siteName, true);
-                        var connectionCounter = new PerformanceCounter("Web Service", "Current Connections", siteName, true);
+                        // Usando o formato correto baseado na saída do PowerShell e mudando para um contador diferente
+                        // var requestCounter = new PerformanceCounter("Web Service", "Get Requests/sec", siteName, true);
+                        // _siteRequestCounters[siteName + "_requests"] = requestCounter;
+                        // requestCounter.NextValue();
                         
-                        _siteRequestCounters[siteName + "_requests"] = requestCounter;
-                        _siteRequestCounters[siteName + "_bytesReceived"] = bytesReceivedCounter;
-                        _siteRequestCounters[siteName + "_bytesSent"] = bytesSentCounter;
-                        _siteRequestCounters[siteName + "_connections"] = connectionCounter;
+
+                        // var bytesReceivedCounter = new PerformanceCounter("Web Service", "Total Bytes Received", siteName, true);
+                        // _siteRequestCounters[siteName + "_bytesReceived"] = bytesReceivedCounter;
+                        // bytesReceivedCounter.NextValue();
+
+                        // var bytesSentCounter = new PerformanceCounter("Web Service", "Total Bytes Sent", siteName, true);
+                        // _siteRequestCounters[siteName + "_bytesSent"] = bytesSentCounter;
+                        // bytesSentCounter.NextValue();
                         
-                        // Inicializar leituras
-                        requestCounter.NextValue();
-                        bytesReceivedCounter.NextValue();
-                        bytesSentCounter.NextValue();
-                        connectionCounter.NextValue();
+                        // var connectionCounter = new PerformanceCounter("Web Service", "Current Connections", siteName, true);
+                        // _siteRequestCounters[siteName + "_connections"] = connectionCounter;
+                        // connectionCounter.NextValue();
                     }
                     catch (Exception ex)
                     {
@@ -549,33 +589,7 @@ public class ServerMonitorService
                     
                     return Math.Round(100.0 * (1.0 - (idleDelta / (double)totalDelta)), 2);
                 }
-            }
-            // Para macOS
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "top",
-                    Arguments = "-l 2 -n 0",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false
-                };
-                
-                using var process = Process.Start(startInfo);
-                if (process != null)
-                {
-                    var output = process.StandardOutput.ReadToEnd();
-                    var cpuLoad = System.Text.RegularExpressions.Regex.Match(output, @"CPU usage: (\d+\.\d+)% user, (\d+\.\d+)% sys, (\d+\.\d+)% idle");
-                    
-                    if (cpuLoad.Success && 
-                        double.TryParse(cpuLoad.Groups[1].Value, out var user) &&
-                        double.TryParse(cpuLoad.Groups[2].Value, out var sys) &&
-                        double.TryParse(cpuLoad.Groups[3].Value, out var idle))
-                    {
-                        return Math.Round(user + sys, 2);
-                    }
-                }
-            }
+            }          
             // Para Windows, tentar método alternativo baseado em WMI
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {

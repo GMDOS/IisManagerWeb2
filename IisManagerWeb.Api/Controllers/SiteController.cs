@@ -151,16 +151,9 @@ public static class SiteController
                 if (site.State == ObjectState.Started)
                     site.Stop();
 
-                var backupDir = Path.Combine(Path.GetDirectoryName(physicalPath) ?? "", "Backups");
-                if (!Directory.Exists(backupDir))
-                    Directory.CreateDirectory(backupDir);
+                var backupFileName = CreateSiteBackup(name, physicalPath);
 
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var backupFileName = Path.Combine(backupDir, $"backup_{name}_{timestamp}.zip");
-
-                System.IO.Compression.ZipFile.CreateFromDirectory(physicalPath, backupFileName);
-
-                var tempZipPath = Path.Combine(Path.GetTempPath(), $"update_{name}_{timestamp}.zip");
+                var tempZipPath = Path.Combine(Path.GetTempPath(), $"update_{name}_{DateTime.Now.ToString("yyyyMMdd_HHmmss")}.zip");
                 using (var fileStream = File.Create(tempZipPath))
                 {
                     await request.Body.CopyToAsync(fileStream);
@@ -390,6 +383,9 @@ public static class SiteController
                 if (site.State == ObjectState.Started)
                     site.Stop();
 
+                // Criar backup do site antes de atualizar
+                var backupFileName = CreateSiteBackup(name, physicalPath);
+
                 var form = await request.ReadFormAsync();
                 var files = form.Files;
 
@@ -447,7 +443,7 @@ public static class SiteController
 
                 site.Start();
 
-                return Results.Ok($"Arquivos do site '{name}' atualizados com sucesso");
+                return Results.Ok($"Arquivos do site '{name}' atualizados com sucesso. Backup criado em {backupFileName}");
             }
             catch (Exception ex)
             {
@@ -508,6 +504,7 @@ public static class SiteController
 
                 var sitesAtualizados = 0;
                 var sitesComErro = new List<string>();
+                var backupsCriados = new Dictionary<string, string>();
 
                 using var serverManager = new ServerManager();
 
@@ -537,6 +534,10 @@ public static class SiteController
                             siteWasRunning = true;
                             site.Stop();
                         }
+
+                        // Criar backup do site antes de atualizar
+                        var backupFileName = CreateSiteBackup(siteName, physicalPath);
+                        backupsCriados.Add(siteName, backupFileName);
 
                         var directories = new HashSet<string>();
 
@@ -604,20 +605,38 @@ public static class SiteController
                     }
                 }
 
+                var mensagemBackups = backupsCriados.Count > 0
+                    ? $" Backups criados: {string.Join(", ", backupsCriados.Select(b => $"{b.Key} em {b.Value}"))}"
+                    : "";
+
                 if (sitesComErro.Count > 0)
                 {
                     return Results.BadRequest(
                         $"Alguns sites apresentaram erros durante a atualização: {string.Join(", ", sitesComErro)}. " +
-                        $"Sites atualizados com sucesso: {sitesAtualizados} de {siteNames.Count}.");
+                        $"Sites atualizados com sucesso: {sitesAtualizados} de {siteNames.Count}.{mensagemBackups}");
                 }
 
-                return Results.Ok($"{sitesAtualizados} site(s) atualizado(s) com sucesso");
+                return Results.Ok($"{sitesAtualizados} site(s) atualizado(s) com sucesso.{mensagemBackups}");
             }
             catch (Exception ex)
             {
                 return Results.BadRequest($"Erro ao atualizar os sites: {ex.Message}");
             }
         });
+    }
+
+    private static string CreateSiteBackup(string siteName, string physicalPath)
+    {
+        var backupDir = Path.Combine(Path.GetDirectoryName(physicalPath) ?? "", "Backups");
+        if (!Directory.Exists(backupDir))
+            Directory.CreateDirectory(backupDir);
+
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var backupFileName = Path.Combine(backupDir, $"backup_{siteName}_{timestamp}.zip");
+
+        System.IO.Compression.ZipFile.CreateFromDirectory(physicalPath, backupFileName);
+        
+        return backupFileName;
     }
 
     private static bool ShouldIgnoreFile(string filePath, List<string> ignoredPatterns)

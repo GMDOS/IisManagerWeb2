@@ -14,7 +14,11 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped(sp => 
 {
     var navigationManager = sp.GetRequiredService<NavigationManager>();
-    return new HttpClient { BaseAddress = new Uri(navigationManager.BaseUri + "api/api") };
+#if DEBUG
+    return new HttpClient { BaseAddress = new Uri("https://localhost:5135/") };
+#else
+    return new HttpClient { BaseAddress = new Uri(navigationManager.BaseUri + "api/") };
+#endif
 });
 builder.Services.AddScoped<SiteService>();
 builder.Services.AddScoped<IUploadFileService, UploadFileService>();

@@ -36,6 +36,7 @@ public static class MetricsController
         {
             if (context.Request.Path == "/metrics/ws")
             {
+                Console.WriteLine("ws iniciado");
                 if (context.WebSockets.IsWebSocketRequest)
                 {
                     var monitorService = app.Services.GetRequiredService<ServerMonitorService>();

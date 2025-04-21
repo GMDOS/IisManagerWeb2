@@ -86,6 +86,7 @@ app.GetSiteRoutes();
 app.GetSiteGroupRoutes();
 app.GetSettingsRoutes();
 app.GetMetricsRoutes();
+app.GetUploadRoutes();
 
 app.Run();
 
@@ -118,6 +119,8 @@ app.Run();
 [JsonSerializable(typeof(List<SiteMetrics>))]
 [JsonSerializable(typeof(MetricsWebSocketPacket))]
 [JsonSerializable(typeof(FileCheckResponse))]
+[JsonSerializable(typeof(Dictionary<string, object>))]
+[JsonSerializable(typeof(object))]
 
 internal partial class AppJsonSerializerContext : JsonSerializerContext
 {

@@ -354,7 +354,6 @@ public static class UploadController
                     {
                         Console.WriteLine($"Erro ao excluir arquivo existente {destinationFile}: {ex.Message}");
                         
-                        // Tente renomear o arquivo de destino se não puder excluí-lo
                         var fileName = Path.GetFileName(destinationFile);
                         var alternativeDestination = Path.Combine(
                             destinationDir,
@@ -364,18 +363,16 @@ public static class UploadController
                     }
                 }
 
-                // Usar Copy + Delete em vez de Move para reduzir problemas
                 File.Copy(file, destinationFile, true);
                 try
                 {
-                    File.Delete(file); // Apagar o arquivo fonte após a cópia bem-sucedida
+                    File.Delete(file);
                 }
                 catch(Exception ex)
                 {
                     Console.WriteLine($"Não foi possível excluir o arquivo fonte após cópia: {ex.Message}");
                 }
                 
-                // Aplicar data de modificação original se disponível
                 if (lastModifiedTimes.TryGetValue(relativePath, out var lastModified))
                 {
                     try 

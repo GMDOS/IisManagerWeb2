@@ -48,7 +48,7 @@ public class ServerMonitorBackgroundService : BackgroundService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Erro ao coletar ou enviar métricas do servidor");
-                    await Task.Delay(5000, stoppingToken); // 5000ms = 5 segundos
+                    await Task.Delay(5000, stoppingToken);
                 }
             }
         }

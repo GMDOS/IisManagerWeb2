@@ -113,7 +113,7 @@ public class ServerMonitorService
     
     public void UpdateRefreshInterval(int milliseconds)
     {
-        if (milliseconds >= 100) // Definindo limite mínimo de 100ms
+        if (milliseconds >= 100) // Limite mínimo de 100ms
         {
             _refreshInterval = milliseconds;
         }

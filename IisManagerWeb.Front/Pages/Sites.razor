@@ -77,14 +77,9 @@
                                                     Reiniciar
                                                 </MudMenuItem>
 
-                                                <MudMenuItem OnClick="@OpenDialog">
-                                                    <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2" />
-                                                    Atualizar Arquivos
-                                                </MudMenuItem>
-                                                
                                                 <MudMenuItem OnClick="@OpenFolderDialog">
                                                     <MudIcon Icon="@Icons.Material.Filled.Folder" Class="mr-2" />
-                                                    Atualizar por Pasta
+                                                    Atualizar Arquivos
                                                 </MudMenuItem>
                                             }
                                         </ChildContent>
@@ -729,50 +724,6 @@
         }
     }
 
-    private async Task OpenDialog()
-    {
-        if (selectedSites.Count != 1) return;
-
-        CloseMenu();
-
-        try
-        {
-            await Task.Delay(100);
-
-            var parameters = new DialogParameters
-            {
-                ["SiteName"] = selectedSites[0].Name
-            };
-
-            var options = new DialogOptions
-            {
-                CloseOnEscapeKey = true,
-                FullWidth = false,
-                MaxWidth = MaxWidth.ExtraSmall,
-                NoHeader = true
-            };
-
-            var dialog = await DialogService.ShowAsync<UpdateFilesDialog>("", parameters, options);
-
-            try
-            {
-                await dialog.Result;
-            }
-            catch (Exception)
-            {
-            }
-            finally
-            {
-                await RefreshSites();
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Erro ao processar diálogo: {ex.Message}", Severity.Error);
-            await RefreshSites();
-        }
-    }
-
     private async Task OpenFolderDialog()
     {
         if (selectedSites.Count != 1) return;
@@ -781,7 +732,6 @@
 
         try
         {
-            await Task.Delay(100);
 
             var parameters = new DialogParameters
             {
@@ -821,7 +771,6 @@
     {
         try
         {
-            await Task.Delay(100);
 
             var options = new DialogOptions
             {
@@ -858,7 +807,6 @@
         
         try
         {
-            await Task.Delay(100);
 
             var options = new DialogOptions
             {

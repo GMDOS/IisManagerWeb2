@@ -41,3 +41,8 @@ public class SiteGroupDto
     public DateTime CreatedAt { get; set; }
     public DateTime? LastModifiedAt { get; set; }
 } 
+
+public class UploadInitResponse
+{
+    public string UploadId { get; set; } = string.Empty;
+} 

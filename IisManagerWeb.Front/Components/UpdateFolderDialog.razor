@@ -7,6 +7,7 @@
 @inject SiteService SiteService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
+@inject IUploadFileService UploadFileService
 @rendermode RenderMode.InteractiveWebAssembly
 
 <MudDialog MaxWidth="MaxWidth.Large" Class="pa-3">
@@ -47,6 +48,17 @@
                                 <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2">
                                     <MudTabPanel Text="Arquivos para Atualizar">
                                         <MudPaper Class="pa-4" Outlined="true" Elevation="0">
+                                            @if (isUploading && uploadProgress > 0)
+                                            {
+                                                <div class="mb-4">
+                                                    <div class="d-flex justify-space-between align-center mb-2">
+                                                        <MudText Typo="Typo.subtitle2">Progresso geral: @uploadProgress%</MudText>
+                                                        <MudText Typo="Typo.caption">@uploadProgressText</MudText>
+                                                    </div>
+                                                    <MudProgressLinear Value="@uploadProgress" Color="Color.Primary" />
+                                                </div>
+                                            }
+                                            
                                             <MudDataGrid T="FileUpdateInfo" 
                                                         Items="@fileCheckResponse.Files.Where(f => !f.IsIgnored).ToList()" 
                                                         Filterable="true" 
@@ -71,6 +83,34 @@
                                                     <TemplateColumn Title="Motivo da Atualização">
                                                         <CellTemplate>
                                                             @GetUpdateReasonText(context.Item.UpdateReason)
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                    <TemplateColumn Title="Progresso" Sortable="false">
+                                                        <CellTemplate>
+                                                            @{
+                                                                var filePath = context.Item.RelativePath;
+                                                                var fileProgress = isUploading ? fileProgressList.FirstOrDefault(f => f.FilePath == filePath) : null;
+                                                            }
+                                                            @if (isUploading && fileProgress != null)
+                                                            {
+                                                                <div class="d-flex flex-column" style="width: 100%">
+                                                                    <div class="d-flex justify-space-between align-center">
+                                                                        <MudProgressLinear Value="@fileProgress.Progress" 
+                                                                                           Color="@(fileProgress.IsCompleted ? Color.Success : fileProgress.HasError ? Color.Error : fileProgress.IsActive ? Color.Info : Color.Default)" 
+                                                                                           Class="flex-grow-1" />
+                                                                        <MudText Typo="Typo.caption" Class="ml-2 text-nowrap">
+                                                                            @(fileProgress.IsCompleted ? "Concluído" : 
+                                                                              fileProgress.HasError ? "Erro" : 
+                                                                              fileProgress.IsActive ? $"{fileProgress.Progress}%" : 
+                                                                              "Aguardando")
+                                                                        </MudText>
+                                                                    </div>
+                                                                </div>
+                                                            }
+                                                            else if (!isUploading)
+                                                            {
+                                                                <MudText Typo="Typo.caption">-</MudText>
+                                                            }
                                                         </CellTemplate>
                                                     </TemplateColumn>
                                                 </Columns>
@@ -161,6 +201,13 @@
     private FileCheckResponse? fileCheckResponse;
     private Dictionary<string, string> folderMap = new();
     
+    private int uploadProgress = 0;
+    private string uploadProgressText = "";
+    private int totalFilesCount = 0;
+    private int currentFileIndex = 0;
+    
+    private List<FileProgressInfo> fileProgressList = new();
+    
     private string GetUpdateReasonText(FileUpdateReason reason)
     {
         return reason switch
@@ -243,17 +290,70 @@
         try
         {
             isUploading = true;
-            message = "Enviando arquivos...";
+            uploadProgress = 0;
+            message = "Iniciando processo de upload...";
             alertSeverity = Severity.Info;
+            
+            // Inicializar a lista de progresso de arquivos
+            fileProgressList.Clear();
+            foreach (var filePath in fileCheckResponse.FilesToUpdate)
+            {
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    fileProgressList.Add(new FileProgressInfo
+                    {
+                        FilePath = filePath,
+                        FileName = Path.GetFileName(filePath),
+                        Progress = 0,
+                        IsActive = false,
+                        IsCompleted = false
+                    });
+                }
+            }
+            
             StateHasChanged();
             
-            var filesToSend = new Dictionary<string, Stream>();
-            var filesLastModified = new Dictionary<string, DateTime>();
+            // Iniciar o processo de upload
+            var iniciarResult = await UploadFileService.IniciarUploadAsync();
             
+            if (!iniciarResult.Succeeded)
+            {
+                Console.WriteLine($"Falha ao iniciar upload: {string.Join(", ", iniciarResult.Errors)}");
+                throw new Exception(string.Join(", ", iniciarResult.Errors));
+            }
+            
+            var uploadId = iniciarResult.Data;
+            Console.WriteLine($"Upload iniciado com sucesso. ID: {uploadId}");
+            
+            if (string.IsNullOrEmpty(uploadId))
+            {
+                throw new Exception("ID de upload vazio recebido da API");
+            }
+            
+            message = "Enviando arquivos...";
+            StateHasChanged();
+            
+            totalFilesCount = fileCheckResponse.FilesToUpdate.Count;
+            currentFileIndex = 0;
+            
+            // Lista de arquivos que falharam ao upload
+            var failedFiles = new List<string>();
+            
+            // Enviar cada arquivo
             foreach (var filePath in fileCheckResponse.FilesToUpdate)
             {                 
                 if(string.IsNullOrEmpty(filePath)){
                     continue;
+                }
+                
+                currentFileIndex++;
+                
+                // Atualizar arquivo atual como ativo
+                var currentFileProgress = fileProgressList.FirstOrDefault(f => f.FilePath == filePath);
+                if (currentFileProgress != null)
+                {
+                    currentFileProgress.IsActive = true;
+                    StateHasChanged();
                 }
                 
                 if (folderMap.TryGetValue(filePath, out var infoJson))
@@ -274,17 +374,99 @@
                     }
                 }
                 
-                var fileContent = await JSRuntime.InvokeAsync<byte[]>("readFileFromFolder", filePath, folderMap);
-                filesToSend.Add(filePath, new MemoryStream(fileContent));
-                
-                var clientFile = clientFiles.FirstOrDefault(f => f.RelativePath == filePath);
-                if (clientFile != null)
+                try 
                 {
-                    filesLastModified.Add(filePath, clientFile.LastModified.ToUniversalTime());
+                    var fileName = Path.GetFileName(filePath);
+                    uploadProgressText = $"Enviando arquivo {currentFileIndex}/{totalFilesCount}: {fileName}";
+                    StateHasChanged();
+                    
+                    var fileContent = await JSRuntime.InvokeAsync<byte[]>("readFileFromFolder", filePath, folderMap);
+                    using var fileStream = new MemoryStream(fileContent);
+                    
+                    var uploadResult = await UploadFileService.EnviarArquivoEmChunksAsync(
+                        uploadId, 
+                        fileStream, 
+                        filePath, 
+                        (long processedBytes, long totalBytes) => 
+                        {
+                            var fileProgress = (int)(processedBytes * 100 / totalBytes);
+                            
+                            if (currentFileProgress != null)
+                            {
+                                if (fileProgress > currentFileProgress.Progress)
+                                {
+                                    currentFileProgress.Progress = fileProgress;
+                                }
+                                else if (fileProgress < currentFileProgress.Progress && fileProgress > 0){
+                                    currentFileProgress.Progress += fileProgress;
+                                }
+                            }
+                            
+                            CalculateOverallProgress();
+                            
+                            uploadProgressText = $"Enviando arquivo {currentFileIndex}/{totalFilesCount}: {fileName} ({fileProgress}%)";
+                            StateHasChanged();
+                        },
+                        clientFiles.FirstOrDefault(f => f.RelativePath == filePath)?.LastModified
+                    );
+                    
+                    if (!uploadResult.Succeeded)
+                    {
+                        failedFiles.Add(filePath);
+                        Console.WriteLine($"Erro ao enviar arquivo {filePath}: {string.Join(", ", uploadResult.Errors)}");
+                        
+                        // Marcar o arquivo como falho
+                        if (currentFileProgress != null)
+                        {
+                            currentFileProgress.IsActive = false;
+                            currentFileProgress.HasError = true;
+                        }
+                    }
+                    else
+                    {
+                        // Marcar o arquivo como concluído
+                        if (currentFileProgress != null)
+                        {
+                            currentFileProgress.IsActive = false;
+                            currentFileProgress.IsCompleted = true;
+                            currentFileProgress.Progress = 100;
+                        }
+                    }
                 }
+                catch (Exception ex)
+                {
+                    failedFiles.Add(filePath);
+                    Console.WriteLine($"Erro ao processar arquivo {filePath}: {ex.Message}");
+                    
+                    // Marcar o arquivo como falho
+                    if (currentFileProgress != null)
+                    {
+                        currentFileProgress.IsActive = false;
+                        currentFileProgress.HasError = true;
+                    }
+                }
+                
+                // Atualiza o progresso geral
+                CalculateOverallProgress();
+                StateHasChanged();
             }
-
-            await SiteService.UpdateSpecificFilesAsync(SiteName, filesToSend, filesLastModified);
+            
+            if (failedFiles.Count > 0)
+            {
+                throw new Exception($"{failedFiles.Count} arquivo(s) não puderam ser enviados. Verifique o console para mais detalhes.");
+            }
+            
+            // Finalizar o upload
+            message = "Finalizando upload e atualizando site...";
+            uploadProgressText = "Finalizando upload e atualizando site...";
+            StateHasChanged();
+            
+            var finalizarResult = await UploadFileService.FinalizarUploadAsync(uploadId, SiteName);
+            
+            if (!finalizarResult.Succeeded)
+            {
+                throw new Exception(string.Join(", ", finalizarResult.Errors));
+            }
             
             message = "Arquivos atualizados com sucesso!";
             alertSeverity = Severity.Success;
@@ -293,12 +475,27 @@
         {
             message = $"Erro ao enviar arquivos: {ex.Message}";
             alertSeverity = Severity.Error;
+            Console.WriteLine($"Erro detalhado: {ex}");
         }
         finally
         {
             isUploading = false;
+            uploadProgress = 0;
+            uploadProgressText = "";
             StateHasChanged();
         }
+    }
+    
+    private void CalculateOverallProgress()
+    {
+        if (fileProgressList.Count == 0)
+            return;
+            
+        // Cálculo do progresso geral considerando todos os arquivos
+        int totalFiles = fileProgressList.Count;
+        double totalProgress = fileProgressList.Sum(f => f.Progress);
+        
+        uploadProgress = (int)(totalProgress / totalFiles);
     }
     
     private class FolderSelectionResult
@@ -313,5 +510,15 @@
     private class FolderItemInfo
     {
         public string Type { get; set; } = string.Empty;
+    }
+
+    private class FileProgressInfo
+    {
+        public string FilePath { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public int Progress { get; set; }
+        public bool IsActive { get; set; }
+        public bool IsCompleted { get; set; }
+        public bool HasError { get; set; }
     }
 } 

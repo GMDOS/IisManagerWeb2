@@ -20,9 +20,9 @@ builder.Services.AddScoped(sp =>
     return new HttpClient { BaseAddress = new Uri(navigationManager.BaseUri + "api/") };
 #endif
 });
-builder.Services.AddScoped<SiteService>();
-builder.Services.AddScoped<IUploadFileService, UploadFileService>();
-builder.Services.AddScoped<SettingsService>();
-builder.Services.AddScoped<MetricsService>();
+builder.Services.AddScoped<IisManagerWeb.Front.Services.SettingsService>();
+builder.Services.AddScoped<IisManagerWeb.Front.Services.MetricsService>();
+builder.Services.AddScoped<IisManagerWeb.Front.Services.SiteService>();
+builder.Services.AddScoped<IisManagerWeb.Front.Services.IUploadFileService, IisManagerWeb.Front.Services.UploadFileService>();
 
 await builder.Build().RunAsync();

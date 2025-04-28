@@ -57,7 +57,7 @@ if (!PrivilegeHelper.IsPrivilegedUser())
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Erro ao tentar elevar privilégios: {ex.Message}");
+        Console.WriteLine($"Erro ao tentar elevar privilégios: {ex.ToString()}");
         Environment.Exit(1);
     }
 }
@@ -71,6 +71,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 builder.Services.AddSingleton<ServerMonitorService>();
 builder.Services.AddHostedService<ServerMonitorBackgroundService>();
+builder.Services.AddScoped<GroupService>();
 
 var app = builder.Build();
 
@@ -119,6 +120,7 @@ app.Run();
 [JsonSerializable(typeof(List<SiteMetrics>))]
 [JsonSerializable(typeof(MetricsWebSocketPacket))]
 [JsonSerializable(typeof(FileCheckResponse))]
+[JsonSerializable(typeof(List<FileCheckResponse>))]
 [JsonSerializable(typeof(Dictionary<string, object>))]
 [JsonSerializable(typeof(object))]
 

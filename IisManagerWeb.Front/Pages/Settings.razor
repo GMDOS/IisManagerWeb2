@@ -148,7 +148,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao carregar configurações: {ex.Message}");
+            Console.WriteLine($"Erro ao carregar configurações: {ex.ToString()}");
             settings = new ManagerSettings();
         }
     }
@@ -186,7 +186,7 @@
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Erro ao salvar configurações: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Erro ao salvar configurações: {ex.ToString()}", Severity.Error);
             }
             finally
             {

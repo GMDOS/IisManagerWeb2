@@ -74,7 +74,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao cancelar diálogo: {ex.Message}");
+            Console.WriteLine($"Erro ao cancelar diálogo: {ex.ToString()}");
         }
     }
     
@@ -101,9 +101,9 @@
         }
         catch (Exception ex)
         {
-            message = $"Erro: {ex.Message}";
+            message = $"Erro: {ex.ToString()}";
             messageColor = Color.Error;
-            Snackbar.Add($"Erro ao atualizar site: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao atualizar site: {ex.ToString()}", Severity.Error);
         }
         finally
         {

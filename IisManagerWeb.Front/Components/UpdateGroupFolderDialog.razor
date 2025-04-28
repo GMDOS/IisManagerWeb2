@@ -1,0 +1,575 @@
+@namespace IisManagerWeb.Front.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.Web.Administration
+@using Microsoft.JSInterop
+@using MudBlazor
+@using MudBlazor.Extensions
+@using System.IO
+@using IisManagerWeb.Front.Services
+@using IisManagerWeb.Shared.Models
+
+@inject IJSRuntime JSRuntime
+@inject UploadFileService UploadFileService
+@inject SiteService SiteService
+@inject ISnackbar Snackbar
+@rendermode RenderMode.InteractiveWebAssembly
+
+<MudDialog>
+    <DialogContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="d-flex flex-column">
+            <MudText Typo="Typo.h5" Class="mb-4">Atualizar Grupo: @GroupName</MudText>
+            
+            @if (!string.IsNullOrEmpty(selectedFolder) && !analyzed)
+            {
+                <MudText Class="mb-3">Analisando arquivos no diretório @selectedFolder...</MudText>
+                <MudProgressLinear Indeterminate="true" Class="my-4" />
+            }
+            else if (string.IsNullOrEmpty(selectedFolder) && !analyzed)
+            {
+                <MudPaper Class="pa-6 mb-4" Elevation="0" Outlined="true">
+                    <MudText Class="mb-4">Selecione a pasta que contém os arquivos para atualizar</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Folder" 
+                               OnClick="SelectFolder">
+                        Selecionar Pasta
+                    </MudButton>
+                </MudPaper>
+            }
+            else if (analyzed && fileCheckResponse != null)
+            {
+                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">Pasta selecionada: @selectedFolder</MudText>
+                    
+                    @if (fileCheckResponse.FilesToUpdate.Count > 0)
+                    {
+                        <MudGrid>
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Info" Class="mb-4">
+                                    <div class="d-flex flex-column">
+                                        <MudText>
+                                            Serão atualizados @fileCheckResponse.FilesToUpdate.Count arquivos para @GroupSites.Count sites no grupo.
+                                        </MudText>
+                                        <MudText Typo="Typo.caption">
+                                            Total: @fileCheckResponse.FilesToUpdate.Count arquivos x @GroupSites.Count sites = @(fileCheckResponse.FilesToUpdate.Count * GroupSites.Count) atualizações
+                                        </MudText>
+                                    </div>
+                                </MudAlert>
+                                
+                                <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2">
+                                    <MudTabPanel Text="Arquivos para Atualizar">
+                                        <MudPaper Class="pa-4" Outlined="true" Elevation="0">
+                                            @if (isUploading && uploadProgress > 0)
+                                            {
+                                                <div class="mb-4">
+                                                    <div class="d-flex justify-space-between align-center mb-2">
+                                                        <MudText Typo="Typo.subtitle2">Progresso geral: @uploadProgress%</MudText>
+                                                        <MudText Typo="Typo.caption">@uploadProgressText</MudText>
+                                                    </div>
+                                                    <MudProgressLinear Value="@uploadProgress" Color="Color.Primary" />
+                                                </div>
+                                                
+                                                @if (!string.IsNullOrEmpty(currentSite))
+                                                {
+                                                    <div class="mb-4">
+                                                        <MudAlert Severity="Severity.Info" Class="mb-2">
+                                                            <MudText Typo="Typo.subtitle2">Atualizando site: @currentSite</MudText>
+                                                            <MudText Typo="Typo.caption">Site @currentSiteIndex de @GroupSites.Count</MudText>
+                                                        </MudAlert>
+                                                    </div>
+                                                }
+                                            }
+                                            
+                                            <MudDataGrid T="FileUpdateInfo" 
+                                                        Items="@fileCheckResponse.Files.Where(f => !f.IsIgnored).ToList()" 
+                                                        Filterable="true" 
+                                                        FilterMode="DataGridFilterMode.Simple"
+                                                        Dense="true" 
+                                                        Bordered="true" 
+                                                        Striped="true"
+                                                        Hover="true"
+                                                        Height="400px">
+                                                <Columns>
+                                                    <PropertyColumn Property="x => x.RelativePath" Title="Arquivo" Sortable="true"/>
+                                                    <TemplateColumn Title="Data Modificação (Cliente)" Sortable="true">
+                                                        <CellTemplate>
+                                                            @(context.Item.ClientFile?.LastModified.ToString("dd/MM/yyyy HH:mm:ss") ?? "-")
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                    <TemplateColumn Title="Data Modificação (Servidor)" Sortable="true">
+                                                        <CellTemplate>
+                                                            @(context.Item.ServerFile?.LastModified.ToString("dd/MM/yyyy HH:mm:ss") ?? "Não existe")
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                    <TemplateColumn Title="Motivo da Atualização" Sortable="true">
+                                                        <CellTemplate>
+                                                            @GetUpdateReasonText(context.Item.UpdateReason)
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                    
+                                                    <TemplateColumn Title="Progresso" Sortable="false">
+                                                        <CellTemplate>
+                                                            @{
+                                                                var filePath = context.Item.RelativePath;
+                                                                var fileProgress = isUploading ? fileProgressList.FirstOrDefault(f => f.FilePath == filePath) : null;
+                                                            }
+                                                            @if (isUploading && fileProgress != null)
+                                                            {
+                                                                <div class="d-flex flex-column" style="width: 100%">
+                                                                    <div>
+                                                                        <MudProgressLinear Value="@fileProgress.Progress" 
+                                                                                           Color="@(fileProgress.IsCompleted ? Color.Success : fileProgress.HasError ? Color.Error : fileProgress.IsActive ? Color.Info : Color.Default)" 
+                                                                                           Class="flex-grow-1" />
+                                                                        <MudText Typo="Typo.caption" Class="ml-2 text-nowrap">
+                                                                            @(fileProgress.IsCompleted ? "Concluído" : 
+                                                                              fileProgress.HasError ? "Erro" : 
+                                                                              fileProgress.IsActive ? $"{fileProgress.Progress}%" : 
+                                                                              "Aguardando")
+                                                                        </MudText>
+                                                                    </div>
+                                                                </div>
+                                                            }
+                                                            else if (!isUploading)
+                                                            {
+                                                                <MudText Typo="Typo.caption">-</MudText>
+                                                            }
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                </Columns>
+                                            </MudDataGrid>
+                                        </MudPaper>
+                                    </MudTabPanel>
+                                    
+                                    <MudTabPanel Text="Ignorados">
+                                        <MudPaper Class="pa-4" Outlined="true" Elevation="0">
+                                            <MudDataGrid T="FileUpdateInfo" 
+                                                        Items="@fileCheckResponse.Files.Where(f => f.IsIgnored).ToList()" 
+                                                        Filterable="true" 
+                                                        FilterMode="DataGridFilterMode.Simple"
+                                                        Dense="true" 
+                                                        Bordered="true" 
+                                                        Striped="true"
+                                                        Hover="true"
+                                                        Height="400px">
+                                                <Columns>
+                                                    <PropertyColumn Property="x => x.RelativePath" Title="Arquivo" Sortable="true"/>
+                                                    <TemplateColumn Title="Data Modificação (Cliente)" Sortable="true">
+                                                        <CellTemplate>
+                                                            @(context.Item.ClientFile?.LastModified.ToString("dd/MM/yyyy HH:mm:ss") ?? "-")
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                    <TemplateColumn Title="Data Modificação (Servidor)" Sortable="true">
+                                                        <CellTemplate>
+                                                            @(context.Item.ServerFile?.LastModified.ToString("dd/MM/yyyy HH:mm:ss") ?? "Não existe")
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                    <TemplateColumn Title="Motivo" Sortable="true">
+                                                        <CellTemplate>
+                                                            @context.Item.IgnoreReason
+                                                        </CellTemplate>
+                                                    </TemplateColumn>
+                                                </Columns>
+                                            </MudDataGrid>
+                                        </MudPaper>
+                                    </MudTabPanel>
+                                </MudTabs>
+                                
+                                <div class="d-flex justify-center mt-4">
+                                    <MudButton OnClick="UploadFiles" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" 
+                                              Variant="Variant.Filled" Disabled="@isUploading">
+                                        @if (isUploading)
+                                        {
+                                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                            <MudText Class="ms-2">Enviando...</MudText>
+                                        }
+                                        else
+                                        {
+                                            @("Enviar arquivos modificados")
+                                        }
+                                    </MudButton>
+                                </div>
+                            </MudItem>
+                        </MudGrid>
+                    }
+                    else if (analyzed)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mt-4">Não há arquivos para atualizar.</MudAlert>
+                        <MudButton OnClick="SelectFolder" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Folder" 
+                                   Variant="Variant.Outlined" Class="mt-4">
+                            Selecionar outra pasta
+                        </MudButton>
+                    }
+                </MudPaper>
+            }
+            
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <MudAlert Severity="@alertSeverity" Class="mt-3">@message</MudAlert>
+            }
+        </MudContainer>
+    </DialogContent>
+    
+    <DialogActions>
+        <MudButton OnClick="Cancel" Color="Color.Default" Variant="Variant.Text">Cancelar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string GroupName { get; set; } = string.Empty;
+    [Parameter] public List<SiteDto> GroupSites { get; set; } = new List<SiteDto>();
+    
+    private string selectedFolder = "";
+    private bool analyzed = false;
+    private string message = "";
+    private FileCheckResponse fileCheckResponse { get; set; } = null!;
+    private Severity alertSeverity = Severity.Info;
+    private List<ClientFileInfo> clientFiles = new();
+    private Dictionary<string, string> folderMap = new();
+    private bool isUploading = false;
+    private List<FileProgressInfo> fileProgressList = new();
+    private int uploadProgress = 0;
+    private string uploadProgressText = "";
+    private int totalFilesCount = 0;
+    private int currentFileIndex = 0;
+    
+    // Variáveis para controle de progresso de grupo
+    private string currentSite = string.Empty;
+    private int currentSiteIndex = 0;
+    
+    private async Task SelectFolder()
+    {
+        try
+        {
+            clientFiles.Clear();
+            message = "Selecione a pasta com os arquivos para atualizar";
+            alertSeverity = Severity.Info;
+            
+            var result = await JSRuntime.InvokeAsync<FolderSelectionResult>("selectFolder");
+            if (result != null && result.Success)
+            {
+                selectedFolder = result.FolderName;
+                clientFiles = result.Files;
+                folderMap = result.FolderMap;
+                
+                // Usar o site de referência (primeiro site do grupo)
+                var firstSite = GroupSites.FirstOrDefault();
+                
+                if (firstSite == null)
+                {
+                    message = "Não há sites no grupo para atualizar";
+                    alertSeverity = Severity.Error;
+                    return;
+                }
+                
+                message = $"Verificando {result.FileCount} arquivos...";
+                StateHasChanged();
+                
+                try
+                {
+                    foreach (var file in clientFiles)
+                    {
+                        file.LastModified = file.LastModified.ToLocalTime();
+                    }
+                    
+                    fileCheckResponse = await SiteService.CheckFilesForGroupUpdateAsync(GroupName, clientFiles);
+                    analyzed = true;
+                    
+                    if (fileCheckResponse.FilesToUpdate.Count == 0)
+                    {
+                        message = "Todos os arquivos já estão atualizados.";
+                        alertSeverity = Severity.Info;
+                    }
+                    else
+                    {
+                        message = $"Encontrados {fileCheckResponse.FilesToUpdate.Count} arquivo(s) para atualizar.";
+                        alertSeverity = Severity.Success;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    message = $"Erro ao analisar arquivos: {ex.ToString()}";
+                    alertSeverity = Severity.Error;
+                    Console.WriteLine($"Erro detalhado: {ex}");
+                }
+            }
+            else
+            {
+                message = "Nenhuma pasta selecionada.";
+                alertSeverity = Severity.Warning;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Erro ao selecionar pasta: {ex.ToString()}";
+            alertSeverity = Severity.Error;
+            Console.WriteLine($"Erro detalhado: {ex}");
+        }
+    }
+    
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+    
+    private async Task UploadFiles()
+    {
+        if (fileCheckResponse == null || fileCheckResponse.FilesToUpdate.Count == 0 || isUploading) return;
+        
+        try
+        {
+            isUploading = true;
+            uploadProgress = 0;
+            message = "Iniciando processo de upload para o grupo...";
+            alertSeverity = Severity.Info;
+            
+            // Inicializar a lista de progresso de arquivos
+            fileProgressList.Clear();
+            foreach (var filePath in fileCheckResponse.FilesToUpdate)
+            {
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    fileProgressList.Add(new FileProgressInfo
+                    {
+                        FilePath = filePath,
+                        FileName = Path.GetFileName(filePath),
+                        Progress = 0,
+                        IsActive = false,
+                        IsCompleted = false
+                    });
+                }
+            }
+            
+            StateHasChanged();
+            
+            // Iniciar o processo de upload para o grupo
+            var iniciarResult = await UploadFileService.IniciarUploadGrupoAsync(GroupName);
+            
+            if (!iniciarResult.Succeeded)
+            {
+                Console.WriteLine($"Falha ao iniciar upload de grupo: {string.Join(", ", iniciarResult.Errors)}");
+                throw new Exception(string.Join(", ", iniciarResult.Errors));
+            }
+            
+            var uploadId = iniciarResult.Data;
+            Console.WriteLine($"Upload de grupo iniciado com sucesso. ID: {uploadId}");
+            
+            if (string.IsNullOrEmpty(uploadId))
+            {
+                throw new Exception("ID de upload vazio recebido da API");
+            }
+            
+            message = "Enviando arquivos para o grupo...";
+            StateHasChanged();
+            
+            totalFilesCount = fileCheckResponse.FilesToUpdate.Count;
+            currentFileIndex = 0;
+            
+            // Lista de arquivos que falharam ao upload
+            var failedFiles = new List<string>();
+            
+            // Enviar cada arquivo uma única vez para o grupo
+            foreach (var filePath in fileCheckResponse.FilesToUpdate)
+            {
+                currentFileIndex++;
+                var currentFileProgress = fileProgressList.FirstOrDefault(f => f.FilePath == filePath);
+                
+                if (currentFileProgress != null)
+                {
+                    currentFileProgress.IsActive = true;
+                    currentFileProgress.Progress = 0;
+                }
+                
+                try
+                {
+                    var fileName = Path.GetFileName(filePath);
+                    uploadProgressText = $"Enviando arquivo {currentFileIndex}/{totalFilesCount}: {fileName}";
+                    StateHasChanged();
+                    
+                    var fileContent = await JSRuntime.InvokeAsync<byte[]>("readFileFromFolder", filePath, folderMap);
+                    using var fileStream = new MemoryStream(fileContent);
+                    
+                    var uploadResult = await UploadFileService.EnviarArquivoEmChunksAsync(
+                        uploadId, 
+                        fileStream, 
+                        filePath, 
+                        GroupName,
+                        (long processedBytes, long totalBytes) => 
+                        {
+                            var fileProgress = totalBytes > 0 ? (int)(processedBytes * 100 / totalBytes) : 100;
+                            
+                            if (currentFileProgress != null)
+                            {
+                                if (fileProgress > currentFileProgress.Progress)
+                                {
+                                    currentFileProgress.Progress = fileProgress;
+                                }
+                                else if (fileProgress < currentFileProgress.Progress && fileProgress > 0){
+                                    currentFileProgress.Progress += fileProgress;
+                                }
+                            }
+                            
+                            CalculateOverallProgress();
+                            
+                            uploadProgressText = $"Enviando arquivo {currentFileIndex}/{totalFilesCount}: {fileName} ({fileProgress}%)";
+                            StateHasChanged();
+                        },
+                        clientFiles.FirstOrDefault(f => f.RelativePath == filePath)?.LastModified,
+                        isGroup: true
+                    );
+                    
+                    if (!uploadResult.Succeeded)
+                    {
+                        failedFiles.Add(filePath);
+                        Console.WriteLine($"Erro ao enviar arquivo {filePath}: {string.Join(", ", uploadResult.Errors)}");
+                        
+                        // Marcar o arquivo como falho
+                        if (currentFileProgress != null)
+                        {
+                            currentFileProgress.IsActive = false;
+                            currentFileProgress.HasError = true;
+                        }
+                    }
+                    else
+                    {
+                        // Marcar o arquivo como concluído
+                        if (currentFileProgress != null)
+                        {
+                            currentFileProgress.IsActive = false;
+                            currentFileProgress.IsCompleted = true;
+                            currentFileProgress.Progress = 100;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failedFiles.Add(filePath);
+                    Console.WriteLine($"Erro ao processar arquivo {filePath}: {ex.ToString()}");
+                    
+                    // Marcar o arquivo como falho
+                    if (currentFileProgress != null)
+                    {
+                        currentFileProgress.IsActive = false;
+                        currentFileProgress.HasError = true;
+                    }
+                }
+                
+                // Atualiza o progresso geral
+                CalculateOverallProgress();
+                StateHasChanged();
+            }
+            
+            if (failedFiles.Count > 0)
+            {
+                throw new Exception($"{failedFiles.Count} arquivo(s) não puderam ser enviados. Verifique o console para mais detalhes.");
+            }
+            
+            // Após upload dos arquivos, atualiza cada site do grupo
+            currentSiteIndex = 0;
+            foreach (var site in GroupSites)
+            {
+                currentSiteIndex++;
+                currentSite = site.Name;
+                
+                message = $"Atualizando site {currentSiteIndex}/{GroupSites.Count}: {site.Name}...";
+                uploadProgressText = $"Atualizando site {currentSiteIndex}/{GroupSites.Count}: {site.Name}...";
+                StateHasChanged();
+                
+                try 
+                {
+                    var finalizarSiteResult = await UploadFileService.FinalizarUploadSiteGrupoAsync(uploadId, GroupName, site.Name);
+                    
+                    if (!finalizarSiteResult.Succeeded)
+                    {
+                        Console.WriteLine($"Erro ao atualizar site {site.Name} do grupo: {string.Join(", ", finalizarSiteResult.Errors)}");
+                        Snackbar.Add($"Erro ao atualizar site {site.Name}: {string.Join(", ", finalizarSiteResult.Errors)}", Severity.Warning);
+                    }
+                    else 
+                    {
+                        Console.WriteLine($"Site {site.Name} atualizado com sucesso");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erro ao atualizar site {site.Name} do grupo: {ex.ToString()}");
+                    Snackbar.Add($"Erro ao atualizar site {site.Name}: {ex.ToString()}", Severity.Warning);
+                }
+            }
+            
+            // Finaliza o processo de upload e limpa arquivos temporários
+            message = "Finalizando upload do grupo...";
+            uploadProgressText = "Finalizando upload do grupo...";
+            currentSite = "";
+            StateHasChanged();
+            
+            var finalizarGrupoResult = await UploadFileService.FinalizarUploadGrupoAsync(uploadId, GroupName);
+            
+            if (!finalizarGrupoResult.Succeeded)
+            {
+                throw new Exception($"Erro ao finalizar upload do grupo: {string.Join(", ", finalizarGrupoResult.Errors)}");
+            }
+            
+            message = "Todos os sites do grupo foram atualizados com sucesso!";
+            alertSeverity = Severity.Success;
+        }
+        catch (Exception ex)
+        {
+            message = $"Erro ao atualizar o grupo: {ex.ToString()}";
+            alertSeverity = Severity.Error;
+            Console.WriteLine($"Erro detalhado: {ex}");
+        }
+        finally
+        {
+            isUploading = false;
+            currentSite = "";
+            StateHasChanged();
+        }
+    }
+    
+    private void CalculateOverallProgress()
+    {
+        if (fileProgressList.Count == 0)
+            return;
+            
+        // Cálculo do progresso geral considerando todos os arquivos
+        int totalFiles = fileProgressList.Count;
+        double totalProgress = fileProgressList.Sum(f => f.Progress);
+        
+        uploadProgress = (int)(totalProgress / totalFiles);
+    }
+    
+    private string GetUpdateReasonText(FileUpdateReason reason)
+    {
+        return reason switch
+        {
+            FileUpdateReason.FileNotExistsOnServer => "Arquivo não existe no servidor",
+            FileUpdateReason.modifiedDateDifferent => "Data de modificação do arquivo é diferente",
+            FileUpdateReason.DifferentSize => "Tamanho do arquivo é diferente",
+            FileUpdateReason.Ignored => "Arquivo ignorado",
+            _ => "Desconhecido"
+        };
+    }
+    
+    private class FolderSelectionResult
+    {
+        public bool Success { get; set; }
+        public string FolderName { get; set; } = string.Empty;
+        public int FileCount { get; set; }
+        public List<ClientFileInfo> Files { get; set; } = new();
+        public Dictionary<string, string> FolderMap { get; set; } = new();
+    }
+
+    private class FolderItemInfo
+    {
+        public string Type { get; set; } = string.Empty;
+    }
+
+    private class FileProgressInfo
+    {
+        public string FilePath { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public int Progress { get; set; }
+        public bool IsActive { get; set; }
+        public bool IsCompleted { get; set; }
+        public bool HasError { get; set; }
+    }
+} 

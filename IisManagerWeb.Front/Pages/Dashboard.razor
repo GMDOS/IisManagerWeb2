@@ -163,7 +163,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao inicializar dashboard: {ex.Message}");
+            Console.WriteLine($"Erro ao inicializar dashboard: {ex.ToString()}");
         }
     }
     
@@ -215,7 +215,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao conectar ao WebSocket: {ex.Message}");
+            Console.WriteLine($"Erro ao conectar ao WebSocket: {ex.ToString()}");
         }
     }
     

@@ -82,7 +82,7 @@ public class MetricsService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao conectar WebSocket: {ex.Message}");
+            Console.WriteLine($"Erro ao conectar WebSocket: {ex.ToString()}");
             lock (_connectionLock)
             {
                 _isConnected = false;
@@ -116,7 +116,7 @@ public class MetricsService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao desconectar WebSocket: {ex.Message}");
+            Console.WriteLine($"Erro ao desconectar WebSocket: {ex.ToString()}");
         }
         finally
         {
@@ -208,7 +208,7 @@ public class MetricsService : IAsyncDisposable
                                         }
                                         catch (Exception ex)
                                         {
-                                            Console.WriteLine($"Erro em callback de métricas: {ex.Message}");
+                                            Console.WriteLine($"Erro em callback de métricas: {ex.ToString()}");
                                         }
                                     }
                                 }
@@ -227,7 +227,7 @@ public class MetricsService : IAsyncDisposable
                                         }
                                         catch (Exception ex)
                                         {
-                                            Console.WriteLine($"Erro em callback de métricas de sites: {ex.Message}");
+                                            Console.WriteLine($"Erro em callback de métricas de sites: {ex.ToString()}");
                                         }
                                     }
                                 }
@@ -248,7 +248,7 @@ public class MetricsService : IAsyncDisposable
                                         }
                                         catch (Exception ex)
                                         {
-                                            Console.WriteLine($"Erro em callback de métricas iniciais: {ex.Message}");
+                                            Console.WriteLine($"Erro em callback de métricas iniciais: {ex.ToString()}");
                                         }
                                     }
                                 }
@@ -267,7 +267,7 @@ public class MetricsService : IAsyncDisposable
                                         }
                                         catch (Exception ex)
                                         {
-                                            Console.WriteLine($"Erro em callback de métricas de sites iniciais: {ex.Message}");
+                                            Console.WriteLine($"Erro em callback de métricas de sites iniciais: {ex.ToString()}");
                                         }
                                     }
                                 }
@@ -284,7 +284,7 @@ public class MetricsService : IAsyncDisposable
                                     }
                                     catch (Exception ex)
                                     {
-                                        Console.WriteLine($"Erro em callback de intervalo de atualização: {ex.Message}");
+                                        Console.WriteLine($"Erro em callback de intervalo de atualização: {ex.ToString()}");
                                     }
                                 }
                             }
@@ -292,7 +292,7 @@ public class MetricsService : IAsyncDisposable
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erro ao processar mensagem do WebSocket: {ex.Message}");
+                        Console.WriteLine($"Erro ao processar mensagem do WebSocket: {ex.ToString()}");
                     }
                 }
             }
@@ -311,7 +311,7 @@ public class MetricsService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao receber mensagens do WebSocket: {ex.Message}");
+            Console.WriteLine($"Erro ao receber mensagens do WebSocket: {ex.ToString()}");
             lock (_connectionLock)
             {
                 _isConnected = false;

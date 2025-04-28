@@ -78,7 +78,7 @@
                                                 </MudMenuItem>
 
                                                 <MudMenuItem OnClick="@OpenFolderDialog">
-                                                    <MudIcon Icon="@Icons.Material.Filled.Folder" Class="mr-2" />
+                                                    <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Class="mr-2" />
                                                     Atualizar Arquivos
                                                 </MudMenuItem>
                                             }
@@ -124,6 +124,14 @@
                                         </MudListItem>
                                     </ActivatorContent>
                                     <ChildContent>
+                                        <MudMenuItem OnClick="@(() => EditGroup(group))">
+                                            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
+                                            Editar
+                                        </MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => DeleteGroup(group))">
+                                            <MudIcon Icon="@Icons.Material.Filled.Delete" Class="mr-2" />
+                                            Excluir
+                                        </MudMenuItem>
                                         <MudMenuItem OnClick="@(() => StartGroup(group))">
                                             <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Class="mr-2" />
                                             Iniciar Todos
@@ -135,14 +143,6 @@
                                         <MudMenuItem OnClick="@(() => UpdateGroupFiles(group))">
                                             <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Class="mr-2" />
                                             Atualizar Arquivos
-                                        </MudMenuItem>
-                                        <MudMenuItem OnClick="@(() => EditGroup(group))">
-                                            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
-                                            Editar
-                                        </MudMenuItem>
-                                        <MudMenuItem OnClick="@(() => DeleteGroup(group))">
-                                            <MudIcon Icon="@Icons.Material.Filled.Delete" Class="mr-2" />
-                                            Excluir
                                         </MudMenuItem>
                                     </ChildContent>
                                 </MudMenu>
@@ -395,7 +395,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao carregar sites: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao carregar sites: {ex.ToString()}", Severity.Error);
         }
         finally
         {
@@ -412,7 +412,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao carregar grupos: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao carregar grupos: {ex.ToString()}", Severity.Error);
         }
         finally
         {
@@ -478,7 +478,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao iniciar site: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao iniciar site: {ex.ToString()}", Severity.Error);
         }
         finally
         {
@@ -496,7 +496,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao parar site: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao parar site: {ex.ToString()}", Severity.Error);
         }
         finally
         {
@@ -514,7 +514,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao reiniciar site: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao reiniciar site: {ex.ToString()}", Severity.Error);
         }
         finally
         {
@@ -543,7 +543,7 @@
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Erro ao criar grupo: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Erro ao criar grupo: {ex.ToString()}", Severity.Error);
             }
         }
         CloseMenu();
@@ -571,7 +571,7 @@
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Erro ao atualizar grupo: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Erro ao atualizar grupo: {ex.ToString()}", Severity.Error);
             }
         }
     }
@@ -595,7 +595,7 @@
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Erro ao excluir grupo: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Erro ao excluir grupo: {ex.ToString()}", Severity.Error);
             }
         }
     }
@@ -610,7 +610,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao iniciar sites do grupo: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao iniciar sites do grupo: {ex.ToString()}", Severity.Error);
         }
     }
 
@@ -624,7 +624,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao parar sites do grupo: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao parar sites do grupo: {ex.ToString()}", Severity.Error);
         }
     }
 
@@ -676,7 +676,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao iniciar sites: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao iniciar sites: {ex.ToString()}", Severity.Error);
         }
     }
 
@@ -698,7 +698,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao parar sites: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao parar sites: {ex.ToString()}", Severity.Error);
         }
     }
 
@@ -720,7 +720,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao reiniciar sites: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao reiniciar sites: {ex.ToString()}", Severity.Error);
         }
     }
 
@@ -762,7 +762,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao processar diálogo: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao processar diálogo: {ex.ToString()}", Severity.Error);
             await RefreshSites();
         }
     }
@@ -796,49 +796,31 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao processar diálogo: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao processar diálogo: {ex.ToString()}", Severity.Error);
             await RefreshSites();
         }
     }
 
     private async Task UpdateGroupFiles(SiteGroupDto group)
     {
-        if (group == null || group.SiteNames.Count == 0) return;
+        if (group == null) return;
         
-        try
+        var sites = GetGroupSites();
+        if (sites.Count == 0)
         {
-
-            var options = new DialogOptions
-            {
-                CloseOnEscapeKey = true,
-                FullWidth = true,
-                MaxWidth = MaxWidth.Medium,
-                NoHeader = true
-            };
-            
-            var parameters = new DialogParameters
-            {
-                ["PreSelectedSiteNames"] = group.SiteNames
-            };
-
-            var dialog = await DialogService.ShowAsync<UpdateMultipleSitesDialog>("", parameters, options);
-
-            try
-            {
-                await dialog.Result;
-            }
-            catch (Exception)
-            {
-            }
-            finally
-            {
-                await RefreshSites();
-            }
+            Snackbar.Add("O grupo não contém sites para atualizar", Severity.Warning);
+            return;
         }
-        catch (Exception ex)
+        
+        var parameters = new DialogParameters
         {
-            Snackbar.Add($"Erro ao processar diálogo: {ex.Message}", Severity.Error);
-            await RefreshSites();
-        }
+            { "GroupName", group.Name },
+            { "GroupSites", sites }
+        };
+        
+        var dialog = await DialogService.ShowAsync<UpdateGroupFolderDialog>("Atualizar Grupo", parameters, dialogOptions);
+        await dialog.Result;
+        
+        await RefreshSites();
     }
 }

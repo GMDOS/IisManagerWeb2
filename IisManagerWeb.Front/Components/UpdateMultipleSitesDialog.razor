@@ -227,7 +227,7 @@
         }
         catch (Exception ex)
         {
-            message = $"Erro ao carregar sites: {ex.Message}";
+            message = $"Erro ao carregar sites: {ex.ToString()}";
             alertSeverity = Severity.Error;
         }
     }
@@ -272,7 +272,7 @@
         }
         catch (Exception ex)
         {
-            message = $"Erro: {ex.Message}";
+            message = $"Erro: {ex.ToString()}";
             alertSeverity = Severity.Error;
         }
     }
@@ -331,7 +331,7 @@
         catch (Exception ex)
         {
             isAnalyzing = false;
-            message = $"Erro ao analisar arquivos: {ex.Message}";
+            message = $"Erro ao analisar arquivos: {ex.ToString()}";
             alertSeverity = Severity.Error;
         }
     }
@@ -370,7 +370,7 @@
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erro ao verificar tipo do item {filePath}: {ex.Message}");
+                        Console.WriteLine($"Erro ao verificar tipo do item {filePath}: {ex.ToString()}");
                     }
                 }
                 
@@ -392,13 +392,13 @@
             }
             catch (Exception ex)
             {
-                message = $"Erro ao atualizar os sites: {ex.Message}";
+                message = $"Erro ao atualizar os sites: {ex}";
                 alertSeverity = Severity.Error;
             }
         }
         catch (Exception ex)
         {
-            message = $"Erro ao enviar arquivos: {ex.Message}";
+            message = $"Erro ao enviar arquivos: {ex}";
             alertSeverity = Severity.Error;
         }
         finally

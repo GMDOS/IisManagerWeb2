@@ -7,7 +7,7 @@
 @inject SiteService SiteService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
-@inject IUploadFileService UploadFileService
+@inject UploadFileService UploadFileService
 @rendermode RenderMode.InteractiveWebAssembly
 
 <MudDialog MaxWidth="MaxWidth.Large" Class="pa-3">
@@ -258,7 +258,7 @@
         }
         catch (Exception ex)
         {
-            message = $"Erro: {ex.Message}";
+            message = $"Erro: {ex.ToString()}";
             alertSeverity = Severity.Error;
         }
     }
@@ -278,7 +278,7 @@
         catch (Exception ex)
         {
             isAnalyzing = false;
-            message = $"Erro ao analisar arquivos: {ex.Message}";
+            message = $"Erro ao analisar arquivos: {ex.ToString()}";
             alertSeverity = Severity.Error;
         }
     }
@@ -294,7 +294,6 @@
             message = "Iniciando processo de upload...";
             alertSeverity = Severity.Info;
             
-            // Inicializar a lista de progresso de arquivos
             fileProgressList.Clear();
             foreach (var filePath in fileCheckResponse.FilesToUpdate)
             {
@@ -313,8 +312,7 @@
             
             StateHasChanged();
             
-            // Iniciar o processo de upload
-            var iniciarResult = await UploadFileService.IniciarUploadAsync();
+            var iniciarResult = await UploadFileService.IniciarUploadAsync(SiteName);
             
             if (!iniciarResult.Succeeded)
             {
@@ -336,10 +334,8 @@
             totalFilesCount = fileCheckResponse.FilesToUpdate.Count;
             currentFileIndex = 0;
             
-            // Lista de arquivos que falharam ao upload
             var failedFiles = new List<string>();
             
-            // Enviar cada arquivo
             foreach (var filePath in fileCheckResponse.FilesToUpdate)
             {                 
                 if(string.IsNullOrEmpty(filePath)){
@@ -348,7 +344,6 @@
                 
                 currentFileIndex++;
                 
-                // Atualizar arquivo atual como ativo
                 var currentFileProgress = fileProgressList.FirstOrDefault(f => f.FilePath == filePath);
                 if (currentFileProgress != null)
                 {
@@ -370,7 +365,7 @@
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erro ao verificar tipo do item {filePath}: {ex.Message}");
+                        Console.WriteLine($"Erro ao verificar tipo do item {filePath}: {ex.ToString()}");
                     }
                 }
                 
@@ -383,62 +378,97 @@
                     var fileContent = await JSRuntime.InvokeAsync<byte[]>("readFileFromFolder", filePath, folderMap);
                     using var fileStream = new MemoryStream(fileContent);
                     
-                    var uploadResult = await UploadFileService.EnviarArquivoEmChunksAsync(
-                        uploadId, 
-                        fileStream, 
-                        filePath, 
-                        (long processedBytes, long totalBytes) => 
+                    if (fileStream.Length == 0)
+                    {
+                        Console.WriteLine($"Aviso: O arquivo {filePath} tem tamanho zero. Pulando cálculo de progresso.");
+                        
+                        var uploadResult = await UploadFileService.EnviarArquivoEmChunksAsync(
+                            uploadId, 
+                            fileStream, 
+                            filePath, 
+                            SiteName,
+                            null,
+                            clientFiles.FirstOrDefault(f => f.RelativePath == filePath)?.LastModified
+                        );
+                        
+                        if (!uploadResult.Succeeded)
                         {
-                            var fileProgress = (int)(processedBytes * 100 / totalBytes);
+                            failedFiles.Add(filePath);
+                            Console.WriteLine($"Erro ao enviar arquivo {filePath}: {string.Join(", ", uploadResult.Errors)}");
                             
                             if (currentFileProgress != null)
                             {
-                                if (fileProgress > currentFileProgress.Progress)
-                                {
-                                    currentFileProgress.Progress = fileProgress;
-                                }
-                                else if (fileProgress < currentFileProgress.Progress && fileProgress > 0){
-                                    currentFileProgress.Progress += fileProgress;
-                                }
+                                currentFileProgress.IsActive = false;
+                                currentFileProgress.HasError = true;
                             }
-                            
-                            CalculateOverallProgress();
-                            
-                            uploadProgressText = $"Enviando arquivo {currentFileIndex}/{totalFilesCount}: {fileName} ({fileProgress}%)";
-                            StateHasChanged();
-                        },
-                        clientFiles.FirstOrDefault(f => f.RelativePath == filePath)?.LastModified
-                    );
-                    
-                    if (!uploadResult.Succeeded)
-                    {
-                        failedFiles.Add(filePath);
-                        Console.WriteLine($"Erro ao enviar arquivo {filePath}: {string.Join(", ", uploadResult.Errors)}");
-                        
-                        // Marcar o arquivo como falho
-                        if (currentFileProgress != null)
+                        }
+                        else
                         {
-                            currentFileProgress.IsActive = false;
-                            currentFileProgress.HasError = true;
+                            if (currentFileProgress != null)
+                            {
+                                currentFileProgress.IsActive = false;
+                                currentFileProgress.IsCompleted = true;
+                                currentFileProgress.Progress = 100;
+                            }
                         }
                     }
                     else
                     {
-                        // Marcar o arquivo como concluído
-                        if (currentFileProgress != null)
+                        var uploadResult = await UploadFileService.EnviarArquivoEmChunksAsync(
+                            uploadId, 
+                            fileStream, 
+                            filePath, 
+                            SiteName,
+                            (long processedBytes, long totalBytes) => 
+                            {
+                                var fileProgress = totalBytes > 0 ? (int)(processedBytes * 100 / totalBytes) : 100;
+                                
+                                if (currentFileProgress != null)
+                                {
+                                    if (fileProgress > currentFileProgress.Progress)
+                                    {
+                                        currentFileProgress.Progress = fileProgress;
+                                    }
+                                    else if (fileProgress < currentFileProgress.Progress && fileProgress > 0){
+                                        currentFileProgress.Progress += fileProgress;
+                                    }
+                                }
+                                
+                                CalculateOverallProgress();
+                                
+                                uploadProgressText = $"Enviando arquivo {currentFileIndex}/{totalFilesCount}: {fileName} ({fileProgress}%)";
+                                StateHasChanged();
+                            },
+                            clientFiles.FirstOrDefault(f => f.RelativePath == filePath)?.LastModified
+                        );
+                        
+                        if (!uploadResult.Succeeded)
                         {
-                            currentFileProgress.IsActive = false;
-                            currentFileProgress.IsCompleted = true;
-                            currentFileProgress.Progress = 100;
+                            failedFiles.Add(filePath);
+                            Console.WriteLine($"Erro ao enviar arquivo {filePath}: {string.Join(", ", uploadResult.Errors)}");
+                            
+                            if (currentFileProgress != null)
+                            {
+                                currentFileProgress.IsActive = false;
+                                currentFileProgress.HasError = true;
+                            }
+                        }
+                        else
+                        {
+                            if (currentFileProgress != null)
+                            {
+                                currentFileProgress.IsActive = false;
+                                currentFileProgress.IsCompleted = true;
+                                currentFileProgress.Progress = 100;
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
                     failedFiles.Add(filePath);
-                    Console.WriteLine($"Erro ao processar arquivo {filePath}: {ex.Message}");
+                    Console.WriteLine($"Erro ao processar arquivo {filePath}: {ex.ToString()}");
                     
-                    // Marcar o arquivo como falho
                     if (currentFileProgress != null)
                     {
                         currentFileProgress.IsActive = false;
@@ -446,7 +476,6 @@
                     }
                 }
                 
-                // Atualiza o progresso geral
                 CalculateOverallProgress();
                 StateHasChanged();
             }
@@ -456,7 +485,6 @@
                 throw new Exception($"{failedFiles.Count} arquivo(s) não puderam ser enviados. Verifique o console para mais detalhes.");
             }
             
-            // Finalizar o upload
             message = "Finalizando upload e atualizando site...";
             uploadProgressText = "Finalizando upload e atualizando site...";
             StateHasChanged();
@@ -473,7 +501,7 @@
         }
         catch (Exception ex)
         {
-            message = $"Erro ao enviar arquivos: {ex.Message}";
+            message = $"Erro ao enviar arquivos: {ex}";
             alertSeverity = Severity.Error;
             Console.WriteLine($"Erro detalhado: {ex}");
         }
@@ -491,7 +519,6 @@
         if (fileProgressList.Count == 0)
             return;
             
-        // Cálculo do progresso geral considerando todos os arquivos
         int totalFiles = fileProgressList.Count;
         double totalProgress = fileProgressList.Sum(f => f.Progress);
         

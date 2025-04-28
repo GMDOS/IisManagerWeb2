@@ -88,7 +88,7 @@ public static class MetricsController
                     }
                     catch (WebSocketException ex)
                     {
-                        Console.WriteLine($"Erro de WebSocket: {ex.Message}");
+                        Console.WriteLine($"Erro de WebSocket: {ex.ToString()}");
                     }
                     finally
                     {

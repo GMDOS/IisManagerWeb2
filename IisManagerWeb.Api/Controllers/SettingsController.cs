@@ -29,7 +29,7 @@ public static class SettingsController
             }
             catch (Exception ex)
             {
-                return Results.BadRequest($"Erro ao obter configurações: {ex.Message}");
+                return Results.BadRequest($"Erro ao obter configurações: {ex.ToString()}");
             }
         });
 
@@ -43,7 +43,7 @@ public static class SettingsController
             }
             catch (Exception ex)
             {
-                return Results.BadRequest($"Erro ao salvar configurações: {ex.Message}");
+                return Results.BadRequest($"Erro ao salvar configurações: {ex.ToString()}");
             }
         });
 
@@ -73,7 +73,7 @@ public static class SettingsController
             }
             catch (Exception ex)
             {
-                return Results.BadRequest($"Erro ao atualizar arquivos ignorados: {ex.Message}");
+                return Results.BadRequest($"Erro ao atualizar arquivos ignorados: {ex.ToString()}");
             }
         });
     }

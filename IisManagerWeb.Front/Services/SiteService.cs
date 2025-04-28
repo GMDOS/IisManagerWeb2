@@ -58,6 +58,13 @@ public class SiteService
         return await response.Content.ReadFromJsonAsync<FileCheckResponse>() ?? new FileCheckResponse();
     }
 
+    public async Task<FileCheckResponse> CheckFilesForGroupUpdateAsync(string groupName, List<ClientFileInfo> files)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"sites/group/{groupName}/check-files", files);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<FileCheckResponse>() ?? new FileCheckResponse();
+    }
+
     public async Task UpdateSpecificFilesAsync(string name, Dictionary<string, Stream> files, Dictionary<string, DateTime>? filesLastModified = null)
     {
         using var content = new MultipartFormDataContent();

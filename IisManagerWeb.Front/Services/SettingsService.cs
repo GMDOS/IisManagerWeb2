@@ -23,7 +23,7 @@ public class SettingsService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter configurações: {ex.Message}");
+            Console.WriteLine($"Erro ao obter configurações: {ex.ToString()}");
             return new ManagerSettings();
         }
     }
@@ -41,7 +41,7 @@ public class SettingsService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao salvar configurações: {ex.Message}");
+            Console.WriteLine($"Erro ao salvar configurações: {ex.ToString()}");
             throw;
         }
     }
@@ -59,7 +59,7 @@ public class SettingsService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao atualizar arquivos ignorados: {ex.Message}");
+            Console.WriteLine($"Erro ao atualizar arquivos ignorados: {ex.ToString()}");
             throw;
         }
     }

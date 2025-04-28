@@ -68,7 +68,7 @@ public class ServerMonitorService
             }
             catch (Exception iisEx)
             {
-                Console.WriteLine($"Falha ao inicializar contadores IIS: {iisEx.Message}");
+                Console.WriteLine($"Falha ao inicializar contadores IIS: {iisEx.ToString()}");
                 _requestsCounter = null;
                 _connectionsCounter = null;
             }
@@ -77,7 +77,7 @@ public class ServerMonitorService
         }
         catch (UnauthorizedAccessException ex)
         {
-            Console.WriteLine($"Erro de permissão ao inicializar contadores de performance: {ex.Message}");
+            Console.WriteLine($"Erro de permissão ao inicializar contadores de performance: {ex.ToString()}");
             Console.WriteLine("Isto pode ocorrer se a aplicação não está sendo executada como administrador.");
             _cpuCounter = null;
             _memoryCounter = null;
@@ -142,7 +142,7 @@ public class ServerMonitorService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter uso de CPU: {ex.Message}");
+            Console.WriteLine($"Erro ao obter uso de CPU: {ex.ToString()}");
             cpuUsage = GetCpuUsageAlternative();
         }
         
@@ -161,7 +161,7 @@ public class ServerMonitorService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter informações de memória: {ex.Message}");
+            Console.WriteLine($"Erro ao obter informações de memória: {ex.ToString()}");
             availableMemoryMB = GetAvailableMemoryInMB();
         }
         
@@ -178,7 +178,7 @@ public class ServerMonitorService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter contagem de requisições: {ex.Message}");
+            Console.WriteLine($"Erro ao obter contagem de requisições: {ex.ToString()}");
             requestsPerSecond = 0;
         }
         
@@ -203,7 +203,7 @@ public class ServerMonitorService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter conexões ativas: {ex.Message}");
+            Console.WriteLine($"Erro ao obter conexões ativas: {ex.ToString()}");
             currentConnections = 0;
         }
         
@@ -255,7 +255,7 @@ public class ServerMonitorService
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erro ao criar contador para o site {siteName}: {ex.Message}");
+                        Console.WriteLine($"Erro ao criar contador para o site {siteName}: {ex.ToString()}");
                         continue;
                     }
                 }
@@ -280,13 +280,13 @@ public class ServerMonitorService
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Erro ao obter métricas do site {siteName}: {ex.Message}");
+                    Console.WriteLine($"Erro ao obter métricas do site {siteName}: {ex.ToString()}");
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter lista de sites: {ex.Message}");
+            Console.WriteLine($"Erro ao obter lista de sites: {ex.ToString()}");
         }
         
         return siteMetrics;
@@ -357,7 +357,7 @@ public class ServerMonitorService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro ao enviar métricas para cliente {client.Key}: {ex.Message}");
+                Console.WriteLine($"Erro ao enviar métricas para cliente {client.Key}: {ex.ToString()}");
                 deadConnections.Add(client.Key);
             }
         }
@@ -401,7 +401,7 @@ public class ServerMonitorService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter memória total: {ex.Message}");
+            Console.WriteLine($"Erro ao obter memória total: {ex.ToString()}");
             return 0;
         }
     }
@@ -451,7 +451,7 @@ public class ServerMonitorService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter memória disponível: {ex.Message}");
+            Console.WriteLine($"Erro ao obter memória disponível: {ex.ToString()}");
             return 0;
         }
     }
@@ -521,7 +521,7 @@ public class ServerMonitorService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter uso alternativo de CPU: {ex.Message}");
+            Console.WriteLine($"Erro ao obter uso alternativo de CPU: {ex.ToString()}");
             return 0;
         }
     }

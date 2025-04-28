@@ -179,7 +179,7 @@ public static class SiteController
             }
             catch (Exception ex)
             {
-                return Results.BadRequest($"Erro ao atualizar os arquivos do site: {ex.Message}");
+                return Results.BadRequest($"Erro ao atualizar os arquivos do site: {ex.ToString()}");
             }
         });
 
@@ -200,28 +200,6 @@ public static class SiteController
                     return Results.BadRequest("Caminho físico do site não encontrado");
                 }
 
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ManagerSettings.json");
-                List<string> ignoredPatterns = new List<string>();
-
-                if (File.Exists(settingsPath))
-                {
-                    try
-                    {
-                        var settingsJson = File.ReadAllText(settingsPath);
-                        var settings = JsonSerializer.Deserialize(settingsJson,
-                            AppJsonSerializerContext.Default.ManagerSettings);
-                        if (settings != null && settings.IgnoredFiles.Count > 0)
-                        {
-                            ignoredPatterns = settings.IgnoredFiles;
-                            Console.WriteLine($"Aplicando {ignoredPatterns.Count} padrões de arquivos ignorados");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Erro ao carregar configurações: {ex.Message}");
-                    }
-                }
-
                 List<ClientFileInfo>? clientFiles = null;
                 try
                 {
@@ -230,7 +208,7 @@ public static class SiteController
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Erro ao deserializar a lista de arquivos: {ex.Message} - {ex.StackTrace}");
+                    Console.WriteLine($"Erro ao deserializar a lista de arquivos: {ex.ToString()} - {ex.StackTrace}");
                     return Results.BadRequest("Erro ao deserializar a lista de arquivos enviada pelo cliente");
                 }
 
@@ -240,102 +218,128 @@ public static class SiteController
                     return Results.Ok(new FileCheckResponse());
                 }
 
-                var filesToUpdate = new List<string>();
-                var response = new FileCheckResponse();
-
-                foreach (var clientFile in clientFiles)
-                {
-                    Console.WriteLine(
-                        $"Verificando arquivo: {clientFile.RelativePath} - {clientFile.IsDirectory} - {clientFile.LastModified}");
-                    var relativePath = clientFile.RelativePath;
-
-                    var fileInfo = new FileUpdateInfo
-                    {
-                        RelativePath = relativePath,
-                        ClientFile = clientFile,
-                        IsIgnored = false
-                    };
-
-                    if (ShouldIgnoreFile(relativePath, ignoredPatterns))
-                    {
-                        Console.WriteLine($"Arquivo ignorado de acordo com as regras configuradas: {relativePath}");
-                        fileInfo.IsIgnored = true;
-                        fileInfo.IgnoreReason = "Arquivo corresponde a um padrão de exclusão";
-                        fileInfo.UpdateReason = FileUpdateReason.Ignored;
-                        response.IgnoredFiles.Add(fileInfo);
-                        response.Files.Add(fileInfo);
-                        continue;
-                    }
-
-                    if (clientFile.IsDirectory)
-                    {
-                        Console.WriteLine("É um diretório");
-                        fileInfo.IsIgnored = true;
-                        fileInfo.IgnoreReason = "É um diretório";
-                        fileInfo.UpdateReason = FileUpdateReason.Ignored;
-                        response.IgnoredFiles.Add(fileInfo);
-                        response.Files.Add(fileInfo);
-                        continue;
-                    }
-
-                    var serverFilePath = Path.Combine(physicalPath, relativePath);
-                    Console.WriteLine($"Caminho do arquivo no servidor: {serverFilePath}");
-
-                    if (!File.Exists(serverFilePath))
-                    {
-                        Console.WriteLine($"Arquivo não existe no servidor: {serverFilePath}");
-                        filesToUpdate.Add(relativePath);
-                        fileInfo.UpdateReason = FileUpdateReason.FileNotExistsOnServer;
-                        response.Files.Add(fileInfo);
-                        response.FilesToUpdate.Add(relativePath);
-                    }
-                    else
-                    {
-                        var fileInfo2 = new FileInfo(serverFilePath);
-                        var serverFile = new ServerFileInfo
-                        {
-                            RelativePath = relativePath,
-                            FileName = Path.GetFileName(serverFilePath),
-                            Size = fileInfo2.Length,
-                            LastModified = fileInfo2.LastWriteTime,
-                            IsDirectory = false
-                        };
-
-                        fileInfo.ServerFile = serverFile;
-
-                        if (File.GetLastWriteTime(serverFilePath) != clientFile.LastModified)
-                        {
-                            Console.WriteLine($"Data de modificação do arquivo é diferente: {serverFilePath}");
-                            filesToUpdate.Add(relativePath);
-                            fileInfo.UpdateReason = FileUpdateReason.modifiedDateDifferent;
-                            response.Files.Add(fileInfo);
-                            response.FilesToUpdate.Add(relativePath);
-                        }
-                        else if (fileInfo2.Length != clientFile.Size)
-                        {
-                            Console.WriteLine($"Tamanho do arquivo é diferente: {serverFilePath}");
-                            filesToUpdate.Add(relativePath);
-                            fileInfo.UpdateReason = FileUpdateReason.DifferentSize;
-                            response.Files.Add(fileInfo);
-                            response.FilesToUpdate.Add(relativePath);
-                        }
-                        else
-                        {
-                            fileInfo.IsIgnored = true;
-                            fileInfo.IgnoreReason = "Arquivo já está atualizado";
-                            fileInfo.UpdateReason = FileUpdateReason.Ignored;
-                            response.IgnoredFiles.Add(fileInfo);
-                            response.Files.Add(fileInfo);
-                        }
-                    }
-                }
-
-                Console.WriteLine($"Arquivos que precisam ser atualizados:\n {string.Join("\n   ", filesToUpdate)}");
+                var response = await VerificarArquivos(site, clientFiles);
                 return Results.Ok(response);
             }
             catch (Exception ex)
             {
-                return Results.BadRequest($"Erro ao verificar arquivos: {ex.Message}");
+                return Results.BadRequest($"Erro ao verificar arquivos: {ex.ToString()}");
+            }
+        });
+
+        siteApi.MapPost("/group/{name}/check-files", async (string name, HttpRequest request) =>
+        {
+            try
+            {
+                Console.WriteLine($"Verificando arquivos para o grupo: {name}");
+                
+                var groupsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "site-groups.json");
+                if (!File.Exists(groupsFilePath))
+                    return Results.NotFound("Arquivo de grupos não encontrado");
+
+                var json = File.ReadAllText(groupsFilePath);
+                var groups = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.ListSiteGroupDto);
+                var group = groups?.FirstOrDefault(g => g.Name == name);
+                
+                if (group == null)
+                    return Results.NotFound($"Grupo '{name}' não encontrado");
+
+                if (group.SiteNames.Count == 0)
+                    return Results.BadRequest("O grupo não possui sites");
+
+                List<ClientFileInfo>? clientFiles = null;
+                try
+                {
+                    clientFiles = await request.ReadFromJsonAsync<List<ClientFileInfo>>();
+                    Console.WriteLine($"Deserialização concluída. Quantidade de arquivos: {clientFiles?.Count ?? 0}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erro ao deserializar a lista de arquivos: {ex.ToString()} - {ex.StackTrace}");
+                    return Results.BadRequest("Erro ao deserializar a lista de arquivos enviada pelo cliente");
+                }
+
+                if (clientFiles == null || clientFiles.Count == 0)
+                {
+                    Console.WriteLine("Nenhum arquivo enviado pelo cliente");
+                    return Results.Ok(new FileCheckResponse());
+                }
+
+                var allFilesToUpdate = new HashSet<string>();
+                var allFiles = new List<FileUpdateInfo>();
+                var allIgnoredFiles = new List<FileUpdateInfo>();
+                
+                using var serverManager = new ServerManager();
+                
+                foreach (var siteName in group.SiteNames)
+                {
+                    Console.WriteLine($"Verificando site {siteName} no grupo {name}");
+                    var site = serverManager.Sites[siteName];
+                    if (site == null)
+                    {
+                        Console.WriteLine($"Site {siteName} não encontrado");
+                        continue;
+                    }
+                    
+                    var siteResponse = await VerificarArquivos(site, clientFiles);
+                    
+                    foreach (var file in siteResponse.FilesToUpdate)
+                    {
+                        allFilesToUpdate.Add(file);
+                    }
+                    
+                    foreach (var file in siteResponse.Files)
+                    {
+                        var existingFile = allFiles.FirstOrDefault(f => f.RelativePath == file.RelativePath);
+                        
+                        if (existingFile != null)
+                        {
+                            if (!file.IsIgnored && file.UpdateReason != FileUpdateReason.Ignored)
+                            {
+                                allFiles.Remove(existingFile);
+                                allFiles.Add(file);
+                                
+                                var ignoredFile = allIgnoredFiles.FirstOrDefault(f => f.RelativePath == file.RelativePath);
+                                if (ignoredFile != null)
+                                {
+                                    allIgnoredFiles.Remove(ignoredFile);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            allFiles.Add(file);
+                            
+                            if (file.IsIgnored)
+                            {
+                                allIgnoredFiles.Add(file);
+                            }
+                        }
+                    }
+                }
+                
+                foreach (var file in allFiles)
+                {
+                    if (allFilesToUpdate.Contains(file.RelativePath))
+                    {
+                        file.IsIgnored = false;
+                        file.IgnoreReason = string.Empty;
+                    }
+                }
+                
+                var response = new FileCheckResponse
+                {
+                    FilesToUpdate = allFilesToUpdate.ToList(),
+                    Files = allFiles,
+                    IgnoredFiles = allIgnoredFiles
+                };
+                
+                Console.WriteLine($"Total de arquivos para atualizar no grupo: {response.FilesToUpdate.Count}");
+                return Results.Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest($"Erro ao verificar arquivos do grupo: {ex.ToString()}");
             }
         });
 
@@ -369,7 +373,7 @@ public static class SiteController
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erro ao carregar configurações: {ex.Message}");
+                        Console.WriteLine($"Erro ao carregar configurações: {ex.ToString()}");
                     }
                 }
 
@@ -439,7 +443,7 @@ public static class SiteController
             }
             catch (Exception ex)
             {
-                return Results.BadRequest($"Erro ao atualizar os arquivos do site: {ex.Message}");
+                return Results.BadRequest($"Erro ao atualizar os arquivos do site: {ex.ToString()}");
             }
         });
 
@@ -489,7 +493,7 @@ public static class SiteController
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erro ao carregar configurações: {ex.Message}");
+                        Console.WriteLine($"Erro ao carregar configurações: {ex.ToString()}");
                     }
                 }
 
@@ -590,7 +594,7 @@ public static class SiteController
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erro ao atualizar o site {siteName}: {ex.Message}");
+                        Console.WriteLine($"Erro ao atualizar o site {siteName}: {ex.ToString()}");
                         sitesComErro.Add(siteName);
                     }
                 }
@@ -610,9 +614,137 @@ public static class SiteController
             }
             catch (Exception ex)
             {
-                return Results.BadRequest($"Erro ao atualizar os sites: {ex.Message}");
+                return Results.BadRequest($"Erro ao atualizar os sites: {ex.ToString()}");
             }
         });
+    }
+
+    private static async Task<FileCheckResponse> VerificarArquivos(Site site, List<ClientFileInfo> clientFiles)
+    {
+        var physicalPath = site.Applications["/"].VirtualDirectories["/"].PhysicalPath;
+        if (string.IsNullOrEmpty(physicalPath))
+        {
+            throw new Exception("Caminho físico do site não encontrado");
+        }
+        
+        Console.WriteLine($"Caminho físico do site {site.Name}: {physicalPath}");
+        
+        var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ManagerSettings.json");
+        List<string> ignoredPatterns = new List<string>();
+
+        if (File.Exists(settingsPath))
+        {
+            try
+            {
+                var settingsJson = File.ReadAllText(settingsPath);
+                var settings = JsonSerializer.Deserialize(settingsJson,
+                    AppJsonSerializerContext.Default.ManagerSettings);
+                if (settings != null && settings.IgnoredFiles.Count > 0)
+                {
+                    ignoredPatterns = settings.IgnoredFiles;
+                    Console.WriteLine($"Aplicando {ignoredPatterns.Count} padrões de arquivos ignorados");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao carregar configurações: {ex.ToString()}");
+            }
+        }
+        
+        var filesToUpdate = new List<string>();
+        var response = new FileCheckResponse();
+        
+        foreach (var clientFile in clientFiles)
+        {
+            Console.WriteLine(
+                $"Verificando arquivo: {clientFile.RelativePath} - {clientFile.IsDirectory} - {clientFile.LastModified}");
+            var relativePath = clientFile.RelativePath;
+
+            var fileInfo = new FileUpdateInfo
+            {
+                RelativePath = relativePath,
+                ClientFile = clientFile,
+                IsIgnored = false
+            };
+
+            if (ShouldIgnoreFile(relativePath, ignoredPatterns))
+            {
+                Console.WriteLine($"Arquivo ignorado de acordo com as regras configuradas: {relativePath}");
+                fileInfo.IsIgnored = true;
+                fileInfo.IgnoreReason = "Arquivo corresponde a um padrão de exclusão";
+                fileInfo.UpdateReason = FileUpdateReason.Ignored;
+                response.IgnoredFiles.Add(fileInfo);
+                response.Files.Add(fileInfo);
+                continue;
+            }
+
+            if (clientFile.IsDirectory)
+            {
+                Console.WriteLine("É um diretório");
+                fileInfo.IsIgnored = true;
+                fileInfo.IgnoreReason = "É um diretório";
+                fileInfo.UpdateReason = FileUpdateReason.Ignored;
+                response.IgnoredFiles.Add(fileInfo);
+                response.Files.Add(fileInfo);
+                continue;
+            }
+
+            var serverFilePath = Path.Combine(physicalPath, relativePath);
+            Console.WriteLine($"Caminho do arquivo no servidor: {serverFilePath}");
+
+            if (!File.Exists(serverFilePath))
+            {
+                Console.WriteLine($"Arquivo não existe no servidor: {serverFilePath}");
+                filesToUpdate.Add(relativePath);
+                fileInfo.UpdateReason = FileUpdateReason.FileNotExistsOnServer;
+                response.Files.Add(fileInfo);
+                response.FilesToUpdate.Add(relativePath);
+            }
+            else
+            {
+                var fileInfo2 = new FileInfo(serverFilePath);
+                var serverFile = new ServerFileInfo
+                {
+                    RelativePath = relativePath,
+                    FileName = Path.GetFileName(serverFilePath),
+                    Size = fileInfo2.Length,
+                    LastModified = fileInfo2.LastWriteTime,
+                    IsDirectory = false
+                };
+
+                fileInfo.ServerFile = serverFile;
+
+                if (File.GetLastWriteTime(serverFilePath) != clientFile.LastModified)
+                {
+                    Console.WriteLine($"---------------------------- Data de modificação do arquivo é diferente: {site.Name} {serverFilePath}");
+                    Console.WriteLine($"---------------------------- Data de modificação do arquivo no cliente: {clientFile.LastModified}");
+                    Console.WriteLine($"---------------------------- Data de modificação do arquivo no servidor: {File.GetLastWriteTime(serverFilePath)}");
+                    filesToUpdate.Add(relativePath);
+                    fileInfo.UpdateReason = FileUpdateReason.modifiedDateDifferent;
+                    response.Files.Add(fileInfo);
+                    response.FilesToUpdate.Add(relativePath);
+                }
+                else if (fileInfo2.Length != clientFile.Size)
+                {
+                    Console.WriteLine($"Tamanho do arquivo é diferente: {serverFilePath}");
+                    filesToUpdate.Add(relativePath);
+                    fileInfo.UpdateReason = FileUpdateReason.DifferentSize;
+                    response.Files.Add(fileInfo);
+                    response.FilesToUpdate.Add(relativePath);
+                }
+                else
+                {
+                    fileInfo.IsIgnored = true;
+                    fileInfo.IgnoreReason = "Arquivo já está atualizado";
+                    fileInfo.UpdateReason = FileUpdateReason.Ignored;
+                    response.IgnoredFiles.Add(fileInfo);
+                    response.Files.Add(fileInfo);
+                }
+            }
+        }
+        
+        Console.WriteLine($"Arquivos que precisam ser atualizados no site {site.Name}:\n {string.Join("\n   ", filesToUpdate)}");
+        return response;
     }
 
     private static string CreateSiteBackup(string siteName, string physicalPath)

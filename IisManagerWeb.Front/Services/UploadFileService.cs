@@ -5,36 +5,9 @@ using System.Text.Json.Serialization;
 namespace IisManagerWeb.Front.Services;
 
 /// <summary>
-/// Interface para serviço de upload de arquivos
-/// </summary>
-public interface IUploadFileService
-{
-    /// <summary>
-    /// Inicia um novo processo de upload
-    /// </summary>
-    Task<ServiceResult<string>> IniciarUploadAsync();
-    
-    /// <summary>
-    /// Envia um arquivo para o processo de upload
-    /// </summary>
-    Task<ServiceResult> EnviarArquivoAsync(string uploadId, Stream fileStream, string fileName, DateTime? lastModified = null);
-    
-    /// <summary>
-    /// Envia um arquivo grande em chunks para o processo de upload
-    /// </summary>
-    Task<ServiceResult> EnviarArquivoEmChunksAsync(string uploadId, Stream fileStream, string fileName, 
-        Action<long, long> progressCallback = null, DateTime? lastModified = null);
-    
-    /// <summary>
-    /// Finaliza o processo de upload e atualiza o site
-    /// </summary>
-    Task<ServiceResult> FinalizarUploadAsync(string uploadId, string siteName);
-}
-
-/// <summary>
 /// Implementação do serviço de upload de arquivos
 /// </summary>
-public class UploadFileService : IUploadFileService
+public class UploadFileService
 {
     private readonly SiteService _siteService;
     private readonly HttpClient _httpClient;
@@ -47,13 +20,13 @@ public class UploadFileService : IUploadFileService
     }
     
     /// <summary>
-    /// Inicia um novo processo de upload
+    /// Inicia um novo processo de upload para um site único
     /// </summary>
-    public async Task<ServiceResult<string>> IniciarUploadAsync()
+    public async Task<ServiceResult<string>> IniciarUploadAsync(string siteName)
     {
         try
         {
-            var response = await _httpClient.PostAsync("uploads/iniciar", null);
+            var response = await _httpClient.PostAsync($"uploads/iniciar/{siteName}", null);
             response.EnsureSuccessStatusCode();
             
             var jsonContent = await response.Content.ReadAsStringAsync();
@@ -74,34 +47,13 @@ public class UploadFileService : IUploadFileService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro na deserialização para Dictionary: {ex.Message}");
-                
-                try
-                {
-                    using var document = System.Text.Json.JsonDocument.Parse(jsonContent);
-                    if (document.RootElement.TryGetProperty("uploadId", out var uploadIdElement))
-                    {
-                        var uploadId = uploadIdElement.GetString();
-                        if (!string.IsNullOrEmpty(uploadId))
-                        {
-                            return new ServiceResult<string> 
-                            { 
-                                Succeeded = true, 
-                                Data = uploadId 
-                            };
-                        }
-                    }
-                }
-                catch (Exception jsonEx)
-                {
-                    Console.WriteLine($"Erro na deserialização usando JsonDocument: {jsonEx.Message}");
-                }
+                Console.WriteLine($"Erro ao deserializar a resposta: {ex.ToString()}");
             }
             
             return new ServiceResult<string> 
             { 
                 Succeeded = false, 
-                Errors = new List<string> { $"Não foi possível obter o ID do upload. Resposta: {jsonContent}" } 
+                Errors = new List<string> { "Não foi possível obter o ID de upload da resposta" } 
             };
         }
         catch (Exception ex)
@@ -109,53 +61,69 @@ public class UploadFileService : IUploadFileService
             return new ServiceResult<string> 
             { 
                 Succeeded = false, 
-                Errors = new List<string> { ex.Message } 
+                Errors = new List<string> { ex.ToString() } 
             };
         }
     }
     
     /// <summary>
-    /// Envia um arquivo para o processo de upload
+    /// Inicia um novo processo de upload para um grupo de sites
     /// </summary>
-    public async Task<ServiceResult> EnviarArquivoAsync(string uploadId, Stream fileStream, string fileName, DateTime? lastModified = null)
+    public async Task<ServiceResult<string>> IniciarUploadGrupoAsync(string groupName)
     {
         try
         {
-            if (fileStream.Length > ChunkSize)
-            {
-                return await EnviarArquivoEmChunksAsync(uploadId, fileStream, fileName, null, lastModified);
-            }
-            
-            using var content = new MultipartFormDataContent();
-            using var streamContent = new StreamContent(fileStream);
-            
-            content.Add(streamContent, "file", fileName);
-            
-            if (lastModified.HasValue)
-            {
-                content.Add(new StringContent(lastModified.Value.ToString("o")), "lastModified");
-            }
-            
-            var response = await _httpClient.PostAsync($"uploads/{uploadId}/arquivo", content);
+            var response = await _httpClient.PostAsync($"uploads/grupo/iniciar/{groupName}", null);
             response.EnsureSuccessStatusCode();
             
-            return new ServiceResult { Succeeded = true };
+            var jsonContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Resposta da API para iniciar upload do grupo: {jsonContent}");
+            
+            try
+            {
+                var uploadResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+                if (uploadResponse != null && uploadResponse.TryGetValue("uploadId", out var uploadId) && 
+                    !string.IsNullOrEmpty(uploadId))
+                {
+                    return new ServiceResult<string> 
+                    { 
+                        Succeeded = true, 
+                        Data = uploadId 
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao deserializar a resposta: {ex.ToString()}");
+            }
+            
+            return new ServiceResult<string> 
+            { 
+                Succeeded = false, 
+                Errors = new List<string> { "Não foi possível obter o ID de upload da resposta" } 
+            };
         }
         catch (Exception ex)
         {
-            return new ServiceResult 
+            return new ServiceResult<string> 
             { 
                 Succeeded = false, 
-                Errors = new List<string> { ex.Message } 
+                Errors = new List<string> { ex.ToString() } 
             };
         }
     }
     
     /// <summary>
-    /// Envia um arquivo grande em chunks para o processo de upload
+    /// Envia um arquivo em chunks para o upload especificado (site único ou grupo)
     /// </summary>
-    public async Task<ServiceResult> EnviarArquivoEmChunksAsync(string uploadId, Stream fileStream, string fileName, 
-        Action<long, long> progressCallback = null, DateTime? lastModified = null)
+    public async Task<ServiceResult> EnviarArquivoEmChunksAsync(
+        string uploadId, 
+        Stream fileStream, 
+        string fileName, 
+        string targetName,
+        Action<long, long>? progressCallback = null,
+        DateTime? lastModified = null,
+        bool isGroup = false)
     {
         try
         {
@@ -181,7 +149,11 @@ public class UploadFileService : IUploadFileService
                     content.Add(new StringContent(lastModified.Value.ToString("o")), "lastModified");
                 }
                 
-                var response = await _httpClient.PostAsync($"uploads/{uploadId}/arquivo", content);
+                string endpoint = isGroup 
+                    ? $"uploads/{uploadId}/arquivo/grupo/{targetName}"
+                    : $"uploads/{uploadId}/arquivo/{targetName}";
+                
+                var response = await _httpClient.PostAsync(endpoint, content);
                 response.EnsureSuccessStatusCode();
                 
                 bytesProcessed += bytesRead;
@@ -200,7 +172,7 @@ public class UploadFileService : IUploadFileService
             return new ServiceResult 
             { 
                 Succeeded = false, 
-                Errors = new List<string> { ex.Message } 
+                Errors = new List<string> { ex.ToString() } 
             };
         }
     }
@@ -222,7 +194,51 @@ public class UploadFileService : IUploadFileService
             return new ServiceResult 
             { 
                 Succeeded = false, 
-                Errors = new List<string> { ex.Message } 
+                Errors = new List<string> { ex.ToString() } 
+            };
+        }
+    }
+    
+    /// <summary>
+    /// Finaliza o processo de upload de um site específico dentro de um grupo
+    /// </summary>
+    public async Task<ServiceResult> FinalizarUploadSiteGrupoAsync(string uploadId, string groupName, string siteName)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"uploads/{uploadId}/finalizar/grupo/{groupName}/site/{siteName}", null);
+            response.EnsureSuccessStatusCode();
+            
+            return new ServiceResult { Succeeded = true };
+        }
+        catch (Exception ex)
+        {
+            return new ServiceResult 
+            { 
+                Succeeded = false, 
+                Errors = new List<string> { ex.ToString() } 
+            };
+        }
+    }
+    
+    /// <summary>
+    /// Finaliza o processo de upload para um grupo inteiro e limpa os arquivos temporários
+    /// </summary>
+    public async Task<ServiceResult> FinalizarUploadGrupoAsync(string uploadId, string groupName)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"uploads/{uploadId}/finalizar/grupo/{groupName}", null);
+            response.EnsureSuccessStatusCode();
+            
+            return new ServiceResult { Succeeded = true };
+        }
+        catch (Exception ex)
+        {
+            return new ServiceResult 
+            { 
+                Succeeded = false, 
+                Errors = new List<string> { ex.ToString() } 
             };
         }
     }
@@ -234,5 +250,14 @@ public class UploadFileService : IUploadFileService
 public class ServiceResult<T> : ServiceResult
 {
     public T? Data { get; set; }
+}
+
+/// <summary>
+/// Classe base de resultado
+/// </summary>
+public class ServiceResult
+{
+    public bool Succeeded { get; set; }
+    public List<string> Errors { get; set; } = new();
 }
 

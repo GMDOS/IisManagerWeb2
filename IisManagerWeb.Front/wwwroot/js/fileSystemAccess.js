@@ -5,7 +5,6 @@
 // Variável global para armazenar o handle da pasta raiz
 let rootDirectoryHandle = null;
 
-// Função para selecionar uma pasta
 window.selectFolder = async function () {
     try {
         if (!('showDirectoryPicker' in window)) {

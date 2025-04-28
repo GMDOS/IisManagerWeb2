@@ -87,14 +87,12 @@ public static class UploadController
                 var filePath = Path.Combine(uploadPath, fileName);
                 var chunkPath = Path.Combine(uploadPath, $"{fileName}.part_{chunkIndex}");
                 
-                // Garantir que o diretório pai do chunk exista
                 var chunkDirectory = Path.GetDirectoryName(chunkPath);
                 if (!Directory.Exists(chunkDirectory) && chunkDirectory != null)
                 {
                     Directory.CreateDirectory(chunkDirectory);
                 }
                 
-                // Salvar informação de última modificação, se fornecida
                 if (request.Form.ContainsKey("lastModified") && !string.IsNullOrEmpty(request.Form["lastModified"]))
                 {
                     var lastModified = DateTime.Parse(request.Form["lastModified"]);
@@ -200,7 +198,6 @@ public static class UploadController
             }
         });
         
-        // Novas rotas para upload de grupo de sites
         uploadApi.MapPost("/grupo/iniciar/{groupName}", async (string groupName, [FromServices] GroupService groupService) =>
         {
             try
@@ -211,7 +208,6 @@ public static class UploadController
                     return Results.NotFound($"Grupo '{groupName}' não encontrado ou não contém sites");
                 }
                 
-                // Usa o primeiro site do grupo como base para o upload
                 var firstSiteName = group.SiteNames[0];
                 
                 using var serverManager = new ServerManager();
@@ -282,14 +278,12 @@ public static class UploadController
                 var filePath = Path.Combine(uploadPath, fileName);
                 var chunkPath = Path.Combine(uploadPath, $"{fileName}.part_{chunkIndex}");
                 
-                // Garantir que o diretório pai do chunk exista
                 var chunkDirectory = Path.GetDirectoryName(chunkPath);
                 if (!Directory.Exists(chunkDirectory) && chunkDirectory != null)
                 {
                     Directory.CreateDirectory(chunkDirectory);
                 }
                 
-                // Salvar informação de última modificação, se fornecida
                 if (request.Form.ContainsKey("lastModified") && !string.IsNullOrEmpty(request.Form["lastModified"]))
                 {
                     var lastModified = DateTime.Parse(request.Form["lastModified"]);
@@ -333,7 +327,6 @@ public static class UploadController
                     return Results.BadRequest("Caminho físico do site não encontrado");
                 }
 
-                // Sempre processar os chunks, mesmo que a verificação inicial não os encontre
                 Console.WriteLine($"Verificando chunks pendentes para o grupo: {groupName}, site: {siteName}");
                 ProcessPendingChunks(uploadPath);
 
@@ -354,7 +347,6 @@ public static class UploadController
                     appPool.Stop();
                 }
                 
-                // Para grupos, copiamos os arquivos em vez de movê-los
                 CopyFiles(uploadPath, physicalPath);
                 SetDates(uploadPath, physicalPath, uploadId);
                 
@@ -389,7 +381,6 @@ public static class UploadController
                     return Results.BadRequest("ID de upload inválido ou expirado");
                 }
                 
-                // Limpar recursos
                 if (FileLastModifiedTimes.ContainsKey(uploadId))
                 {
                     FileLastModifiedTimes.Remove(uploadId);
@@ -440,7 +431,6 @@ public static class UploadController
             
             Console.WriteLine($"Processando arquivo: {fileName} com {chunks.Count} chunks");
             
-            // Pegar o diretório do primeiro chunk para determinar o caminho completo
             var firstChunkDir = Path.GetDirectoryName(chunks.First());
             var relativeDir = "";
             
@@ -456,7 +446,6 @@ public static class UploadController
             var targetPath = Path.Combine(uploadPath, relativeDir, fileName);
             Console.WriteLine($"Criando arquivo de saída: {targetPath}");
             
-            // Garantir que o diretório de destino exista
             var targetDir = Path.GetDirectoryName(targetPath);
             if (!Directory.Exists(targetDir) && targetDir != null)
             {
@@ -471,7 +460,6 @@ public static class UploadController
                     outputStream.Write(buffer, 0, buffer.Length);
                     Console.WriteLine($"Adicionado chunk: {chunk} ({buffer.Length} bytes)");
                     
-                    // Excluir arquivo de chunk após processamento
                     try 
                     {
                         File.Delete(chunk);
@@ -480,7 +468,6 @@ public static class UploadController
                     catch (Exception ex)
                     {
                         Console.WriteLine($"Erro ao excluir chunk {chunk}: {ex.Message}");
-                        // Ignorar erros ao excluir chunks temporários
                     }
                 }
             }
@@ -563,9 +550,10 @@ public static class UploadController
                 var relativePath = Path.GetRelativePath(sourcePath, sourceFile);
                 
                 // Corrigir arquivos que ainda possuem .part_0 no nome
+                // Isso aqui provavelmente ta errado, não deveria ter nenhum arquivo com .part_0 no nome nesse momento
                 if (relativePath.EndsWith(".part_0"))
                 {
-                    relativePath = relativePath.Substring(0, relativePath.Length - 7); // Remove ".part_0"
+                    relativePath = relativePath.Substring(0, relativePath.Length - 7); 
                     Console.WriteLine($"Corrigindo nome de arquivo com .part_0: {relativePath}");
                 }
                 
@@ -604,11 +592,8 @@ public static class UploadController
                 var relativePath = Path.GetRelativePath(sourcePath, sourceFile);
                 var targetFilePath = Path.Combine(targetPath, relativePath);
                 
-                // Definir data de última modificação original, se disponível
-                // Verificar pelo caminho relativo completo
                 if (FileLastModifiedTimes.TryGetValue(uploadId, out var dateDict))
                 {
-                    // Tenta pelo caminho relativo normalizado (caminho com barras)
                     var normalizedPath = relativePath.Replace('\\', '/');
                     Console.WriteLine($"Tentando aplicar data de modificação ao arquivo {normalizedPath}");
                     if (dateDict.TryGetValue(normalizedPath, out var lastModifiedDate))
@@ -616,7 +601,6 @@ public static class UploadController
                         Console.WriteLine($"Aplicando data de modificação {lastModifiedDate} ao arquivo {targetFilePath}");
                         File.SetLastWriteTime(targetFilePath, lastModifiedDate);
                     }
-                    // Se não encontrar, tenta pelo nome do arquivo com o caminho original
                     else if (dateDict.TryGetValue(relativePath, out lastModifiedDate))
                     {
                         Console.WriteLine($"Aplicando data de modificação {lastModifiedDate} ao arquivo {targetFilePath}");
@@ -634,7 +618,6 @@ public static class UploadController
 }
 
 
-// Implementação concreta do serviço de grupos
 public class GroupService
 {
     private readonly string _groupsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "site-groups.json");

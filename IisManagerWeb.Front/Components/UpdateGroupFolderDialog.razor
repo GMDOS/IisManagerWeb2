@@ -174,18 +174,13 @@
                                 </MudTabs>
                                 
                                 <div class="d-flex justify-center mt-4">
-                                    <MudButton OnClick="UploadFiles" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" 
-                                              Variant="Variant.Filled" Disabled="@isUploading">
-                                        @if (isUploading)
-                                        {
-                                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                                            <MudText Class="ms-2">Enviando...</MudText>
-                                        }
-                                        else
-                                        {
+                                    @if (!isUploading && string.IsNullOrEmpty(currentSite) && uploadProgress == 0 && !hasStartedUpload)
+                                    {
+                                        <MudButton OnClick="UploadFiles" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" 
+                                                   Variant="Variant.Filled">
                                             @("Enviar arquivos modificados")
-                                        }
-                                    </MudButton>
+                                        </MudButton>
+                                    }
                                 </div>
                             </MudItem>
                         </MudGrid>
@@ -209,7 +204,7 @@
     </DialogContent>
     
     <DialogActions>
-        <MudButton OnClick="Cancel" Color="Color.Default" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="Cancel" Color="Color.Default" Variant="Variant.Text">Fechar</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -231,8 +226,7 @@
     private string uploadProgressText = "";
     private int totalFilesCount = 0;
     private int currentFileIndex = 0;
-    
-    // Variáveis para controle de progresso de grupo
+    private bool hasStartedUpload = false;
     private string currentSite = string.Empty;
     private int currentSiteIndex = 0;
     
@@ -243,6 +237,7 @@
             clientFiles.Clear();
             message = "Selecione a pasta com os arquivos para atualizar";
             alertSeverity = Severity.Info;
+            hasStartedUpload = false;
             
             var result = await JSRuntime.InvokeAsync<FolderSelectionResult>("selectFolder");
             if (result != null && result.Success)
@@ -251,7 +246,6 @@
                 clientFiles = result.Files;
                 folderMap = result.FolderMap;
                 
-                // Usar o site de referência (primeiro site do grupo)
                 var firstSite = GroupSites.FirstOrDefault();
                 
                 if (firstSite == null)
@@ -318,11 +312,11 @@
         try
         {
             isUploading = true;
+            hasStartedUpload = true;
             uploadProgress = 0;
             message = "Iniciando processo de upload para o grupo...";
             alertSeverity = Severity.Info;
             
-            // Inicializar a lista de progresso de arquivos
             fileProgressList.Clear();
             foreach (var filePath in fileCheckResponse.FilesToUpdate)
             {
@@ -341,7 +335,6 @@
             
             StateHasChanged();
             
-            // Iniciar o processo de upload para o grupo
             var iniciarResult = await UploadFileService.IniciarUploadGrupoAsync(GroupName);
             
             if (!iniciarResult.Succeeded)
@@ -364,10 +357,8 @@
             totalFilesCount = fileCheckResponse.FilesToUpdate.Count;
             currentFileIndex = 0;
             
-            // Lista de arquivos que falharam ao upload
             var failedFiles = new List<string>();
             
-            // Enviar cada arquivo uma única vez para o grupo
             foreach (var filePath in fileCheckResponse.FilesToUpdate)
             {
                 currentFileIndex++;
@@ -422,7 +413,6 @@
                         failedFiles.Add(filePath);
                         Console.WriteLine($"Erro ao enviar arquivo {filePath}: {string.Join(", ", uploadResult.Errors)}");
                         
-                        // Marcar o arquivo como falho
                         if (currentFileProgress != null)
                         {
                             currentFileProgress.IsActive = false;
@@ -431,7 +421,6 @@
                     }
                     else
                     {
-                        // Marcar o arquivo como concluído
                         if (currentFileProgress != null)
                         {
                             currentFileProgress.IsActive = false;
@@ -445,7 +434,6 @@
                     failedFiles.Add(filePath);
                     Console.WriteLine($"Erro ao processar arquivo {filePath}: {ex.ToString()}");
                     
-                    // Marcar o arquivo como falho
                     if (currentFileProgress != null)
                     {
                         currentFileProgress.IsActive = false;
@@ -453,7 +441,6 @@
                     }
                 }
                 
-                // Atualiza o progresso geral
                 CalculateOverallProgress();
                 StateHasChanged();
             }
@@ -463,7 +450,6 @@
                 throw new Exception($"{failedFiles.Count} arquivo(s) não puderam ser enviados. Verifique o console para mais detalhes.");
             }
             
-            // Após upload dos arquivos, atualiza cada site do grupo
             currentSiteIndex = 0;
             foreach (var site in GroupSites)
             {
@@ -495,7 +481,6 @@
                 }
             }
             
-            // Finaliza o processo de upload e limpa arquivos temporários
             message = "Finalizando upload do grupo...";
             uploadProgressText = "Finalizando upload do grupo...";
             currentSite = "";
@@ -530,7 +515,6 @@
         if (fileProgressList.Count == 0)
             return;
             
-        // Cálculo do progresso geral considerando todos os arquivos
         int totalFiles = fileProgressList.Count;
         double totalProgress = fileProgressList.Sum(f => f.Progress);
         

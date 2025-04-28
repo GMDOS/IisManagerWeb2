@@ -36,18 +36,13 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="CancelDialog" Color="Color.Default" Variant="Variant.Outlined">Cancelar</MudButton>
-        <MudButton OnClick="Upload" Color="Color.Primary" Variant="Variant.Filled" 
-                   Disabled="@(selectedFile == null || isUploading)">
-            @if (isUploading)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                <span>Enviando...</span>
-            }
-            else
-            {
+        @if (!isUploading && string.IsNullOrEmpty(message))
+        {
+            <MudButton OnClick="Upload" Color="Color.Primary" Variant="Variant.Filled" 
+                   Disabled="@(selectedFile == null)">
                 <span>Enviar e Atualizar</span>
-            }
-        </MudButton>
+            </MudButton>
+        }
     </DialogActions>
 </MudDialog>
 

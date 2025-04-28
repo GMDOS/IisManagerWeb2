@@ -767,40 +767,6 @@
         }
     }
 
-    private async Task OpenMultiSiteUpdateDialog()
-    {
-        try
-        {
-
-            var options = new DialogOptions
-            {
-                CloseOnEscapeKey = true,
-                FullWidth = true,
-                MaxWidth = MaxWidth.Medium,
-                NoHeader = true
-            };
-
-            var dialog = await DialogService.ShowAsync<UpdateMultipleSitesDialog>("", options);
-
-            try
-            {
-                await dialog.Result;
-            }
-            catch (Exception)
-            {
-            }
-            finally
-            {
-                await RefreshSites();
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Erro ao processar diálogo: {ex.ToString()}", Severity.Error);
-            await RefreshSites();
-        }
-    }
-
     private async Task UpdateGroupFiles(SiteGroupDto group)
     {
         if (group == null) return;

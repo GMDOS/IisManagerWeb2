@@ -7,7 +7,7 @@ namespace IisManagerWeb.Shared;
 [JsonSerializable(typeof(SiteMetrics))]
 [JsonSerializable(typeof(ServerMetricsHistory))]
 [JsonSerializable(typeof(MetricsWebSocketPacket))]
-[JsonSerializable(typeof(object))] // Para objetos anônimos
+[JsonSerializable(typeof(object))] 
 public partial class AppJsonSerializerContext : JsonSerializerContext
 {
 } 

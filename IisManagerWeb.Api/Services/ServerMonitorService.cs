@@ -236,6 +236,9 @@ public class ServerMonitorService
                 {
                     try
                     {
+                        // Bagunça para tentar fazer funcionar contadores de performance do windows
+                        // eu odeio windows
+                        // eu odeio contadores de performance do windows
                         // var requestCounter = new PerformanceCounter("Web Service", "Get Requests/sec", siteName, true);
                         // _siteRequestCounters[siteName + "_requests"] = requestCounter;
                         // requestCounter.NextValue();

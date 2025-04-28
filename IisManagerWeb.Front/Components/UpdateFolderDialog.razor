@@ -145,18 +145,13 @@
                                 </MudTabs>
                                 
                                 <div class="d-flex justify-center mt-4">
-                                    <MudButton OnClick="UploadFiles" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" 
-                                              Variant="Variant.Filled" Disabled="@isUploading">
-                                        @if (isUploading)
-                                        {
-                                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                                            <MudText Class="ms-2">Enviando...</MudText>
-                                        }
-                                        else
-                                        {
+                                    @if (!isUploading && uploadProgress == 0 && !hasStartedUpload)
+                                    {
+                                        <MudButton OnClick="UploadFiles" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" 
+                                                  Variant="Variant.Filled">
                                             @("Enviar arquivos modificados")
-                                        }
-                                    </MudButton>
+                                        </MudButton>
+                                    }
                                 </div>
                             </MudItem>
                         </MudGrid>
@@ -180,7 +175,7 @@
     </DialogContent>
     
     <DialogActions>
-        <MudButton OnClick="Cancel" Color="Color.Default" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton OnClick="Cancel" Color="Color.Default" Variant="Variant.Text">Fechar</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -196,6 +191,7 @@
     private bool analyzed = false;
     private string message = string.Empty;
     private Severity alertSeverity = Severity.Info;
+    private bool hasStartedUpload = false;
     
     private List<ClientFileInfo> clientFiles = new();
     private FileCheckResponse? fileCheckResponse;
@@ -234,6 +230,7 @@
             fileCheckResponse = null;
             message = string.Empty;
             analyzed = false;
+            hasStartedUpload = false;
             
             var result = await JSRuntime.InvokeAsync<FolderSelectionResult>("selectFolder");
             
@@ -290,6 +287,7 @@
         try
         {
             isUploading = true;
+            hasStartedUpload = true;
             uploadProgress = 0;
             message = "Iniciando processo de upload...";
             alertSeverity = Severity.Info;
